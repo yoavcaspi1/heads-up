@@ -1,0 +1,7 @@
+.build/
+build/
+build_number.txt
+.DS_Store
+*.xcodeproj
+.swiftpm/
+.superpowers/

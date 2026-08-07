@@ -1,0 +1,64 @@
+<!doctype html>
+<html lang="en" class="no-background">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <meta
+      http-equiv="Content-Security-Policy"
+      content="default-src 'self'; base-uri 'self'; object-src 'none'; script-src 'self' 'unsafe-inline' file: glaze-core: http://localhost:* http://127.0.0.1:* http://0.0.0.0:*; style-src 'self' 'unsafe-inline' file: glaze-core: http://localhost:* http://127.0.0.1:* http://0.0.0.0:*; img-src 'self' data: blob: file: local: ipc: glaze-core: https: http://localhost:* http://127.0.0.1:* http://0.0.0.0:*; font-src 'self' data: file: glaze-core:; connect-src 'self' file: local: ipc: glaze: glaze-core: https: http://localhost:* http://127.0.0.1:* http://0.0.0.0:* ws://localhost:* ws://127.0.0.1:* ws://0.0.0.0:*; media-src 'self' data: blob: file: local: ipc: https:; worker-src 'self' blob:; frame-src 'self' blob: data:"
+    />
+    <title>Meeting Alert</title>
+    <script>
+      if (window.matchMedia("(prefers-color-scheme: dark)").matches) {
+        document.documentElement.classList.add("dark");
+      }
+      const params = new URLSearchParams(location.search);
+      if (params.get("bg") === "blur") {
+        document.documentElement.classList.add("alert-blur");
+        const intensity = Number(params.get("intensity"));
+        const opacity = Number.isFinite(intensity) ? Math.min(100, Math.max(0, intensity)) / 100 : 0.3;
+        document.documentElement.style.setProperty("--alert-tint-opacity", String(opacity));
+      }
+    </script>
+    <style>
+      /* Opaque, appearance-adaptive full-screen surface. */
+      :root {
+        --alert-surface: #ececec;
+      }
+      .dark {
+        --alert-surface: #1c1c1e;
+      }
+      html,
+      body,
+      #root {
+        height: 100%;
+        margin: 0;
+        background: var(--alert-surface);
+      }
+      /* Blurred mode: let the native vibrancy material behind the window show through, with an
+         adjustable tint on top (--alert-tint-opacity) so the "bluriness" slider has visible effect —
+         macOS vibrancy itself has no continuous blur-radius control, only fixed material types. */
+      html.alert-blur,
+      html.alert-blur body,
+      html.alert-blur #root {
+        background: transparent;
+      }
+      html.alert-blur #root {
+        position: relative;
+      }
+      html.alert-blur #root::before {
+        content: "";
+        position: absolute;
+        inset: 0;
+        z-index: -1;
+        background: var(--alert-surface);
+        opacity: var(--alert-tint-opacity, 0.3);
+        pointer-events: none;
+      }
+    </style>
+  </head>
+  <body>
+    <div id="root"></div>
+    <script type="module" src="./renderer/alert/index.tsx"></script>
+  </body>
+</html>

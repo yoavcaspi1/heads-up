@@ -1,0 +1,29 @@
+Heads Up - Source-Available License
+
+Copyright (c) 2026 Yoav Caspi. All rights reserved.
+
+Permission is granted, free of charge, to any person obtaining a copy of
+this software and associated source code (the "Software"), to:
+
+1. View and study the source code.
+2. Compile the Software from unmodified source and run it for personal,
+   non-commercial use, including receiving updates by pulling this
+   repository and rebuilding.
+
+The following are NOT permitted without prior written permission from the
+copyright holder:
+
+- Modifying the Software or creating derivative works.
+- Redistributing the Software or any part of it, in source or binary form,
+  outside of ordinary use of the hosting platform (e.g. cloning or forking
+  on GitHub as permitted by its Terms of Service).
+- Using the Software, or any part of its source code, in other software or
+  for any commercial purpose.
+
+THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+COPYRIGHT HOLDER BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY,
+WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF
+OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
+SOFTWARE.
