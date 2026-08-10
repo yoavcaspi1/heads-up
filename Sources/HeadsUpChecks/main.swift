@@ -19,6 +19,7 @@ await schedulerTests()
 await trayModelTests()
 await calendarListModelTests()
 await settingsViewTests()
+await setupWizardModelTests()
 await updateCheckerTests()
 
 print("")
