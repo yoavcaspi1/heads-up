@@ -3,7 +3,7 @@ import HeadsUpKit
 
 // Single-instance lock: if another Heads Up is already running, activate it
 // and exit instead of spawning a second tray/scheduler/window set.
-let bundleID = Bundle.main.bundleIdentifier ?? "com.cedoreholdings.headsup"
+let bundleID = Bundle.main.bundleIdentifier ?? "com.yoavcaspi.headsup"
 let others = NSRunningApplication.runningApplications(withBundleIdentifier: bundleID)
     .filter { $0.processIdentifier != ProcessInfo.processInfo.processIdentifier }
 if let other = others.first {

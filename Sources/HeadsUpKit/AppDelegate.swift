@@ -34,9 +34,14 @@ public final class AppDelegate: NSObject, NSApplicationDelegate {
         // The group's domain moved to eloryo.com, so the Keychain service was
         // renamed with it. Adopt anything an earlier version left under the
         // old name before the first read. Silent and idempotent: once there
-        // is nothing left to move this costs a single attribute query, and
-        // the bundle ID is deliberately untouched, so this is purely a
-        // relabelling of items the app already owns.
+        // is nothing left to move this costs a single attribute query, which
+        // reads attributes only and so never raises an access prompt.
+        //
+        // Note this relabels items, it does not re-file them: an item keeps
+        // the access-control list it was created with. 1.2.0 also renamed the
+        // bundle identifier, which is part of a self-signed app's designated
+        // requirement, so the first launch after updating asks the user to
+        // confirm access to each item it already owns (see the README).
         secrets.migrateItems(fromService: KeychainSecretStore.legacyService)
         credentials = GoogleCredentialsStore(secrets: secrets)
         oauth = GoogleOAuth(credentials: credentials, secrets: secrets)
@@ -119,7 +124,7 @@ public final class AppDelegate: NSObject, NSApplicationDelegate {
         // real alert's content on demand.
         if ProcessInfo.processInfo.arguments.contains("--debug-seam") {
             DistributedNotificationCenter.default().addObserver(
-                forName: Notification.Name("com.cedoreholdings.headsup.debug.test-alert"),
+                forName: Notification.Name("com.yoavcaspi.headsup.debug.test-alert"),
                 object: nil, queue: .main) { [weak self] notification in
                 // The notification object may carry a custom title so layout
                 // issues can be reproduced with the exact offending text.

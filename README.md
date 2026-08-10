@@ -30,7 +30,7 @@ configurable number of minutes before each meeting.
 ```bash
 git clone https://github.com/yoavcaspi1/heads-up.git
 cd heads-up
-swift run HeadsUpChecks   # optional: run the test suite, expect "passed 73, failed 0"
+swift run HeadsUpChecks   # optional: run the test suite, expect "passed 77, failed 0"
 ./build_app.sh release    # builds, signs and installs /Applications/Heads Up.app
 ```
 
@@ -179,13 +179,55 @@ git pull
   name `com.eloryo.headsup` (generic-password items). Installs predating the
   rename hold their items under `com.cedoreholdings.headsup`; the app moves
   them across silently on first launch of a version that has this change,
-  then deletes the old items. The bundle identifier is unchanged.
+  then deletes the old items. See [Keychain access
+  prompts](#keychain-access-prompts) for the one-time dialog 1.2.0 raises.
 - **Logs**: not yet writing to `~/Library/Logs/HeadsUp/`; current
   diagnostics go through `NSLog`/Console.app only (see Known notes below).
 
 Deleting both the Application Support folder and the Keychain items for that
 service is a full reset (equivalent to a fresh install, will require
 re-adding accounts and re-entering the OAuth client credentials).
+
+## Keychain access prompts
+
+A Keychain item remembers which code may read it, as a code-signing
+requirement recorded in the item's access-control list. For an app signed
+with a self-signed certificate that requirement is `identifier "<bundle id>"
+and certificate leaf = H"<cert hash>"`, so it covers the bundle identifier as
+well as the certificate.
+
+**1.2.0 renamed the bundle identifier** from `com.cedoreholdings.headsup` to
+`com.yoavcaspi.headsup`, which means existing items no longer match. On the
+first launch after updating, macOS asks once per stored item (the OAuth
+client credentials, plus one token item per connected Google account):
+
+> Heads Up wants to use information stored in "com.eloryo.headsup" in your
+> keychain.
+
+**Click "Always Allow".** That adds the renamed app to the item's
+access-control list permanently, and nothing is asked again. "Allow" grants
+access for that launch only, so the dialog returns on the next one.
+
+Nothing is lost if the prompt is dismissed or denied: the app treats an
+unreadable item exactly as it treats a missing one, so it falls back to the
+normal "not connected" state and offers to re-run the OAuth flow, and the
+prompt reappears on the next launch. Be aware of one wrinkle if you go that
+route rather than allowing access: writing a secret needs no read access, so
+re-authenticating into an item the app still cannot read will appear to work
+and then come up empty again. The app detects this and logs
+
+> HeadsUp Keychain wrote … but cannot read it back
+
+to Console. There is no way to repair the access-control list from code (both
+deleting and re-adding the item are refused for the same reason), so the fix
+is to answer the prompt with Always Allow, or to delete the
+`com.eloryo.headsup` items in Keychain Access and set the app up again.
+
+The same mechanism, for the certificate half of the requirement rather than
+the identifier half, is why a rebuild can re-raise the dialog. The durable
+fix for that is to trust the certificate: in Keychain Access, double-click
+**HeadsUp Developer**, expand **Trust**, and set **Code Signing** to **Always
+Trust** (admin password required).
 
 ## Debug flags
 
@@ -223,12 +265,12 @@ kit (`Sources/HeadsUpChecks/TestKit.swift`) instead of an XCTest harness.
 swift run HeadsUpChecks
 ```
 
-This runs 73 checks across design tokens, settings persistence, meeting-link
+This runs 77 checks across design tokens, settings persistence, meeting-link
 classification, event normalization, the Keychain-backed secret store, PKCE,
 the loopback OAuth redirect server, OAuth error classification, the
 multi-account registry, the calendar client, the scheduler, the tray model,
 the calendar list model, and settings view logic. All are expected to pass
-(`passed 73, failed 0`) on a clean checkout.
+(`passed 77, failed 0`) on a clean checkout.
 
 `HeadsUpChecks` is a plain command-line target: it does not create an
 `NSApplication` or open any window, so it is safe to run in the background,

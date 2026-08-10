@@ -43,7 +43,7 @@ enum NotionCalendarLink {
             URLQueryItem(name: "startDate", value: format(event.start)),
             URLQueryItem(name: "endDate", value: format(event.end)),
             URLQueryItem(name: "title", value: event.title),
-            URLQueryItem(name: "ref", value: "com.cedoreholdings.headsup"),
+            URLQueryItem(name: "ref", value: "com.yoavcaspi.headsup"),
         ])
         comps.queryItems = items
         return comps.url

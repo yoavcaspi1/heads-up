@@ -39,13 +39,42 @@ final class KeychainSecretStore: SecretStore {
          kSecAttrAccount as String: key]
     }
 
+    /// True for the statuses that mean "the item is there, but this build is
+    /// not on its access-control list" rather than "no such item". macOS
+    /// answers a denied read with `errSecAuthFailed` once the user dismisses
+    /// the access prompt, and with `errSecInteractionNotAllowed` when no
+    /// prompt could be shown at all.
+    private static func isAccessDenied(_ status: OSStatus) -> Bool {
+        status == errSecAuthFailed || status == errSecInteractionNotAllowed
+            || status == errSecUserCanceled
+    }
+
+    /// Advice printed alongside every access-control failure. See the
+    /// "Keychain access prompts" section of the README for the background.
+    private static let accessDeniedHint =
+        "the item's Keychain ACL names an earlier code identity of this app; "
+        + "answer the macOS prompt with Always Allow, or delete the item in "
+        + "Keychain Access to start clean"
+
     func data(for key: String) -> Data? {
         var query = baseQuery(key)
         query[kSecReturnData as String] = true
         query[kSecMatchLimit as String] = kSecMatchLimitOne
         var result: AnyObject?
         let status = SecItemCopyMatching(query as CFDictionary, &result)
-        guard status == errSecSuccess else { return nil }
+        guard status == errSecSuccess else {
+            // Absence is the ordinary case (first run, or an account that has
+            // never been connected) and stays quiet. A denial is not: it looks
+            // identical to absence from here, and the caller will react by
+            // asking the user to authenticate again, so say why in the log.
+            if Self.isAccessDenied(status) {
+                NSLog("HeadsUp Keychain read denied for %@ in %@ (%d) - %@",
+                      key, service, status, Self.accessDeniedHint)
+            } else if status != errSecItemNotFound {
+                NSLog("HeadsUp Keychain read failed for %@ in %@: %d", key, service, status)
+            }
+            return nil
+        }
         return result as? Data
     }
 
@@ -60,9 +89,38 @@ final class KeychainSecretStore: SecretStore {
             if addStatus != errSecSuccess {
                 NSLog("HeadsUp Keychain set failed for %@: %d", key, addStatus)
             }
-        } else if updateStatus != errSecSuccess {
-            NSLog("HeadsUp Keychain set failed for %@: %d", key, updateStatus)
+            return
         }
+        if updateStatus != errSecSuccess {
+            NSLog("HeadsUp Keychain set failed for %@: %d", key, updateStatus)
+            return
+        }
+        // A write can land in an item this build is not allowed to read back:
+        // `SecItemUpdate` needs no decrypt authorization, so it succeeds even
+        // against a stale access-control list, while `SecItemCopyMatching`
+        // does not. Left undetected that produces the worst failure mode
+        // available here - re-authentication that reports success, stores a
+        // good token, and still comes up empty on the next launch, forever.
+        // Neither deleting nor re-adding the item can clear this from code
+        // (both are refused for the same reason), so the only honest response
+        // is to name it in the log; the fix is a user action, once.
+        if !verifyReadBack(data, for: key) {
+            NSLog("HeadsUp Keychain wrote %@ but cannot read it back - %@",
+                  key, Self.accessDeniedHint)
+        }
+    }
+
+    /// Reads `key` straight back and compares. Silent and cheap when the ACL
+    /// is intact, which is every case except the launch after a code-identity
+    /// change; a mismatch (rather than a denial) would mean a second writer.
+    private func verifyReadBack(_ written: Data, for key: String) -> Bool {
+        var query = baseQuery(key)
+        query[kSecReturnData as String] = true
+        query[kSecMatchLimit as String] = kSecMatchLimitOne
+        var result: AnyObject?
+        guard SecItemCopyMatching(query as CFDictionary, &result) == errSecSuccess,
+              let stored = result as? Data else { return false }
+        return stored == written
     }
 
     func delete(_ key: String) {

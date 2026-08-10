@@ -25,7 +25,7 @@ func notionCalendarLinkTests() async {
         try expect(s.contains("startDate=2026-08-07T11:00:00.000Z"))
         try expect(s.contains("endDate=2026-08-07T12:30:00.000Z"))
         try expect(s.contains("title=New%20Sites"))
-        try expect(s.contains("ref=com.cedoreholdings.headsup"))
+        try expect(s.contains("ref=com.yoavcaspi.headsup"))
     }
 
     await test("testAllDayUsesDateOnlyFormat") {

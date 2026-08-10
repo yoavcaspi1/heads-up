@@ -37,7 +37,7 @@ fi
 
 APP_NAME="HeadsUp"
 APP_DISPLAY_NAME="Heads Up"
-BUNDLE_ID="com.cedoreholdings.headsup"
+BUNDLE_ID="com.yoavcaspi.headsup"
 SIGN_IDENTITY="HeadsUp Developer"
 
 echo "==> Building Swift package ($CONFIG)..."
