@@ -35,7 +35,14 @@ if [[ "$DRY_RUN" == "false" ]]; then
     gh auth status >/dev/null 2>&1 || { echo "Error: gh not authenticated" >&2; exit 1; }
 fi
 
-echo "==> Building universal release bundle"
+# Build from a neutral /tmp clone: SPM bakes the absolute build path into
+# the binary (Bundle.module fallback), and the real checkout's path contains
+# personal info that must not ship.
+BUILD_SRC=$(mktemp -d /tmp/headsup-release.XXXXXX)
+trap 'rm -rf "$BUILD_SRC"' EXIT
+echo "==> Building universal release bundle in $BUILD_SRC"
+git clone --quiet . "$BUILD_SRC"
+pushd "$BUILD_SRC" >/dev/null
 if [[ "$DRY_RUN" == "true" ]]; then
     HEADSUP_UNIVERSAL=true ./build_app.sh release --no-install
 else
@@ -44,7 +51,8 @@ else
     HEADSUP_SIGN_IDENTITY="$DEV_ID" HEADSUP_UNIVERSAL=true HEADSUP_HARDENED=true \
         ./build_app.sh release --no-install
 fi
-APP="build/$APP_DISPLAY_NAME.app"
+popd >/dev/null
+APP="$BUILD_SRC/build/$APP_DISPLAY_NAME.app"
 
 echo "==> Scanning binary for personal paths"
 if strings "$APP/Contents/MacOS/HeadsUp" | grep -E "/Users/|CBD Dropbox"; then
@@ -80,7 +88,7 @@ hdiutil create -volname "$APP_DISPLAY_NAME" -srcfolder "$STAGE" -ov -format UDZO
 ditto -c -k --keepParent "$APP" "$ZIP"
 
 echo "==> Signing the update zip (Sparkle EdDSA)"
-SIGN_TOOL=$(find .build/artifacts -name sign_update -type f -perm +111 2>/dev/null | head -1)
+SIGN_TOOL=$(find "$BUILD_SRC/.build/artifacts" -name sign_update -type f -perm +111 2>/dev/null | head -1)
 if [[ -z "$SIGN_TOOL" ]]; then
     echo "Error: sign_update tool not found under .build/artifacts" >&2
     exit 1
