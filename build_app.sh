@@ -46,14 +46,20 @@ HARDENED="${HEADSUP_HARDENED:-false}"
 echo "==> Building Swift package ($CONFIG)..."
 # Only the app product: HeadsUpChecks needs -enable-testing on HeadsUpKit,
 # which is debug-only, so a plain `swift build -c release` cannot build it.
-ARCH_FLAGS=()
 if [[ "$UNIVERSAL" == "true" ]]; then
-    ARCH_FLAGS=(--arch arm64 --arch x86_64)
+    # Two single-arch builds + lipo: `swift build --arch a --arch b` needs
+    # full Xcode's xcbuild, which a CLT-only machine does not have.
+    swift build -c "$CONFIG" --product "$APP_NAME" --triple arm64-apple-macosx
+    swift build -c "$CONFIG" --product "$APP_NAME" --triple x86_64-apple-macosx
+    BIN_PATH=$(swift build -c "$CONFIG" --triple arm64-apple-macosx --show-bin-path)
+    BIN_PATH_X86=$(swift build -c "$CONFIG" --triple x86_64-apple-macosx --show-bin-path)
+    EXEC_PATH="$BIN_PATH/$APP_NAME-universal"
+    lipo -create "$BIN_PATH/$APP_NAME" "$BIN_PATH_X86/$APP_NAME" -output "$EXEC_PATH"
+else
+    swift build -c "$CONFIG" --product "$APP_NAME"
+    BIN_PATH=$(swift build -c "$CONFIG" --show-bin-path)
+    EXEC_PATH="$BIN_PATH/$APP_NAME"
 fi
-swift build -c "$CONFIG" --product "$APP_NAME" ${ARCH_FLAGS[@]+"${ARCH_FLAGS[@]}"}
-
-BIN_PATH=$(swift build -c "$CONFIG" ${ARCH_FLAGS[@]+"${ARCH_FLAGS[@]}"} --show-bin-path)
-EXEC_PATH="$BIN_PATH/$APP_NAME"
 
 if [[ ! -x "$EXEC_PATH" ]]; then
     echo "Error: built executable not found at $EXEC_PATH" >&2
