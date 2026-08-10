@@ -40,6 +40,9 @@ final class AlertWindowController {
     /// alert is already up and rebuild the panels instead of leaving them
     /// stale (opaque under blur, or vice versa).
     private var windowsAlertBackground: AppSettings.AlertBackground?
+    /// Live-geometry observers, alive only while an alert is on screen.
+    private var screenParametersObserver: Any?
+    private var screensWokeObserver: Any?
 
     init(settingsStore: SettingsStore,
          onSnooze: @escaping (CalendarEvent, Int) -> Void,
@@ -84,25 +87,35 @@ final class AlertWindowController {
     func show(_ event: CalendarEvent) {
         currentEvent = event
         let settings = settingsStore.settings
+        observeScreenChanges()
 
-        if isOpen {
-            if windowsAlertBackground == settings.alertBackground {
-                // Alert already up, same background mode: swap content in
-                // place instead of stacking windows. The replacement alert
-                // still gets the full activation, retry and diagnostics
-                // pass below: a silent focus refusal on the second event
-                // must be recovered and logged like any other.
-                for window in windows { window.contentView = makeContentView(event) }
-                activateAndVerify(tag: Self.tag(event))
-                return
-            }
-            // Alert background mode changed while an alert is up: isOpaque
-            // was fixed at panel creation, so a content-only swap would
-            // leave a blur-mode alert opaque (or a solid-mode alert
-            // transparent). Tear the panels down and rebuild them below.
+        // Alert already up in the same background mode, and the existing
+        // panels still match the current display layout: swap content in
+        // place instead of stacking windows. The replacement alert still
+        // gets the full activation, retry and diagnostics pass below: a
+        // silent focus refusal on the second event must be recovered and
+        // logged like any other.
+        //
+        // Otherwise rebuild. Two things force that: a background mode change
+        // (isOpaque is fixed at panel creation, so a content-only swap would
+        // leave a blur-mode alert opaque, or a solid-mode alert transparent),
+        // and a display count change (panels are one-per-screen, so the
+        // mapping itself is stale and cannot be fixed by resizing).
+        if isOpen, windowsAlertBackground == settings.alertBackground, applyScreenFrames() {
+            for window in windows { window.contentView = makeContentView(event) }
+        } else {
             closeWindows()
+            buildWindows(for: event, settings: settings)
         }
 
+        activateAndVerify(tag: Self.tag(event))
+        // The panels may have been built from geometry the window server was
+        // still settling (the wake-from-sleep case), so take a second look
+        // shortly after showing.
+        refitWindowsSoon()
+    }
+
+    private func buildWindows(for event: CalendarEvent, settings: AppSettings) {
         for screen in NSScreen.screens {
             let panel = AlertPanel(contentRect: screen.frame,
                                    styleMask: [.borderless, .nonactivatingPanel],
@@ -120,7 +133,69 @@ final class AlertWindowController {
             windows.append(panel)
         }
         windowsAlertBackground = settings.alertBackground
-        activateAndVerify(tag: Self.tag(event))
+    }
+
+    // MARK: - Screen geometry
+
+    /// Screen geometry is only sampled when the panels are built, so anything
+    /// that moves it afterwards leaves the alert covering a stale rect: the
+    /// desktop stays visible beside a part-screen overlay. Wake from sleep is
+    /// the common trigger, since the window server can report transitional
+    /// geometry for a moment after the display comes back, and a resolution
+    /// or display change while an alert is up does the same.
+    private func observeScreenChanges() {
+        if screenParametersObserver == nil {
+            screenParametersObserver = NotificationCenter.default.addObserver(
+                forName: NSApplication.didChangeScreenParametersNotification,
+                object: nil, queue: .main) { [weak self] _ in
+                self?.refitWindowsSoon()
+            }
+        }
+        if screensWokeObserver == nil {
+            screensWokeObserver = NSWorkspace.shared.notificationCenter.addObserver(
+                forName: NSWorkspace.screensDidWakeNotification,
+                object: nil, queue: .main) { [weak self] _ in
+                self?.refitWindowsSoon()
+            }
+        }
+    }
+
+    /// Re-fit now and once more shortly after: geometry settles
+    /// asynchronously, so the notification itself can arrive while the
+    /// window server still reports the old or a transitional frame.
+    private func refitWindowsSoon() {
+        refitWindows()
+        DispatchQueue.main.asyncAfter(deadline: .now() + 0.5) { [weak self] in
+            self?.refitWindows()
+        }
+    }
+
+    /// Re-applies the live screen frames, rebuilding the panels when the
+    /// display count no longer matches. Safe to call at any time: a no-op
+    /// when nothing is open or every panel already fits its screen.
+    private func refitWindows() {
+        guard isOpen, let event = currentEvent else { return }
+        guard !applyScreenFrames() else { return }
+        FileDiag.log("alert (\(Self.tag(event))): display count changed, rebuilding alert windows")
+        closeWindows()
+        buildWindows(for: event, settings: settingsStore.settings)
+        // The rebuild destroyed the key window; restore it without a fresh
+        // activation pass, which would yank focus back if the user had
+        // deliberately switched away.
+        windows.first?.makeKeyAndOrderFront(nil)
+    }
+
+    /// Resizes each open panel to its screen's current frame. Returns false
+    /// when the panel-per-screen mapping itself is stale (a display was
+    /// added or removed), which resizing cannot fix.
+    private func applyScreenFrames() -> Bool {
+        let screens = NSScreen.screens
+        guard screens.count == windows.count else { return false }
+        for (panel, screen) in zip(windows, screens) where panel.frame != screen.frame {
+            FileDiag.log("alert: screen geometry changed, refitting alert window")
+            panel.setFrame(screen.frame, display: true)
+        }
+        return true
     }
 
     /// Activation, Escape monitoring, one refusal-scoped retry, and the
@@ -189,6 +264,14 @@ final class AlertWindowController {
         if let observer = becameActiveObserver {
             NotificationCenter.default.removeObserver(observer)
             becameActiveObserver = nil
+        }
+        if let observer = screenParametersObserver {
+            NotificationCenter.default.removeObserver(observer)
+            screenParametersObserver = nil
+        }
+        if let observer = screensWokeObserver {
+            NSWorkspace.shared.notificationCenter.removeObserver(observer)
+            screensWokeObserver = nil
         }
         closeWindows()
         onDismissed?()
