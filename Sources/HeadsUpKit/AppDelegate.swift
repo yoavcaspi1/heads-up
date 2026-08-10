@@ -30,7 +30,14 @@ public final class AppDelegate: NSObject, NSApplicationDelegate {
                                                   in: .userDomainMask)[0]
             .appendingPathComponent("HeadsUp")
         settingsStore = SettingsStore(directory: supportDir)
-        let secrets = KeychainSecretStore(service: "com.cedoreholdings.headsup")
+        let secrets = KeychainSecretStore(service: KeychainSecretStore.defaultService)
+        // The group's domain moved to eloryo.com, so the Keychain service was
+        // renamed with it. Adopt anything an earlier version left under the
+        // old name before the first read. Silent and idempotent: once there
+        // is nothing left to move this costs a single attribute query, and
+        // the bundle ID is deliberately untouched, so this is purely a
+        // relabelling of items the app already owns.
+        secrets.migrateItems(fromService: KeychainSecretStore.legacyService)
         credentials = GoogleCredentialsStore(secrets: secrets)
         oauth = GoogleOAuth(credentials: credentials, secrets: secrets)
         registry = GoogleAccountsRegistry(directory: supportDir, oauth: oauth)

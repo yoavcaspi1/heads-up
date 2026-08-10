@@ -176,7 +176,10 @@ git pull
     per-account state (reconnect-needed flags, etc.). Tokens themselves are
     not in this file.
 - **OAuth client secret and per-account tokens**: macOS Keychain, service
-  name `com.cedoreholdings.headsup` (generic-password items).
+  name `com.eloryo.headsup` (generic-password items). Installs predating the
+  rename hold their items under `com.cedoreholdings.headsup`; the app moves
+  them across silently on first launch of a version that has this change,
+  then deletes the old items. The bundle identifier is unchanged.
 - **Logs**: not yet writing to `~/Library/Logs/HeadsUp/`; current
   diagnostics go through `NSLog`/Console.app only (see Known notes below).
 
