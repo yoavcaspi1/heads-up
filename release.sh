@@ -63,8 +63,9 @@ fi
 # them (system rpaths like /usr/lib/swift are fine and stay). sort -u:
 # otool lists each rpath once per architecture, delete_rpath hits all
 # slices at once.
-otool -l "$APP/Contents/MacOS/HeadsUp" | grep -A2 LC_RPATH | grep " path /Users/" \
-    | awk '{print $2}' | sort -u | while read -r rp; do
+RPATHS=$(otool -l "$APP/Contents/MacOS/HeadsUp" \
+    | awk '$1 == "path" && $2 ~ /^\/Users\// {print $2}' | sort -u)
+for rp in $RPATHS; do
     install_name_tool -delete_rpath "$rp" "$APP/Contents/MacOS/HeadsUp"
     echo "    stripped rpath $rp"
 done
