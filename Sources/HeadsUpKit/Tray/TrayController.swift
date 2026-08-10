@@ -13,6 +13,7 @@ final class TrayController: NSObject {
     /// surfaces an "Update to X…" item at the top of the right-click menu.
     var updateAvailable: String?
     var onRunUpdate: (() -> Void)?
+    var onOpenSetupGuide: (() -> Void)?
 
     private var statusItem: NSStatusItem?
     private var tickTimer: Timer?
@@ -117,6 +118,9 @@ final class TrayController: NSObject {
         let settings = NSMenuItem(title: "Settings…", action: #selector(openSettings), keyEquivalent: "")
         settings.target = self
         menu.addItem(settings)
+        let guide = NSMenuItem(title: "Setup Guide…", action: #selector(openSetupGuide), keyEquivalent: "")
+        guide.target = self
+        menu.addItem(guide)
         menu.addItem(.separator())
         let quit = NSMenuItem(title: "Quit Heads Up", action: #selector(NSApplication.terminate(_:)), keyEquivalent: "q")
         menu.addItem(quit)
@@ -137,6 +141,10 @@ final class TrayController: NSObject {
 
     @objc private func openSettings() {
         onOpenSettings()
+    }
+
+    @objc private func openSetupGuide() {
+        onOpenSetupGuide?()
     }
 
     @objc private func runUpdate() {

@@ -12,6 +12,7 @@ public final class AppDelegate: NSObject, NSApplicationDelegate {
     private var tray: TrayController!
     private var mainWindow: MainWindowController!
     private var settingsWindow: SettingsWindowController!
+    private var setupWizard: SetupWizardWindowController!
     private var updateChecker: UpdateChecker!
 
     public override init() {
@@ -97,6 +98,13 @@ public final class AppDelegate: NSObject, NSApplicationDelegate {
         // the appearance controls stay reachable; undo that on any dismiss.
         alerts.onDismissed = { [weak self] in
             self?.settingsWindow.window?.level = .normal
+        }
+
+        setupWizard = SetupWizardWindowController(credentials: credentials, registry: registry)
+        tray.onOpenSetupGuide = { [weak self] in self?.setupWizard?.show() }
+        if SetupWizardModel.shouldAutoShow(credentialsConfigured: credentials.isConfigured)
+            || ProcessInfo.processInfo.arguments.contains("--setup-wizard") {
+            setupWizard.show()
         }
 
         lastAlertAppearance = appearanceSignature(settingsStore.settings)
