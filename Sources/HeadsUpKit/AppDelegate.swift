@@ -1,5 +1,6 @@
 import AppKit
 import CoreText
+import Sparkle
 
 public final class AppDelegate: NSObject, NSApplicationDelegate {
     private var settingsStore: SettingsStore!
@@ -13,7 +14,9 @@ public final class AppDelegate: NSObject, NSApplicationDelegate {
     private var mainWindow: MainWindowController!
     private var settingsWindow: SettingsWindowController!
     private var setupWizard: SetupWizardWindowController!
-    private var updateChecker: UpdateChecker!
+    // nil when running as a bare executable (swift run): Sparkle needs a
+    // real bundle with SUFeedURL to start, and dev runs have neither.
+    private var updaterController: SPUStandardUpdaterController?
 
     public override init() {
         super.init()
@@ -68,12 +71,13 @@ public final class AppDelegate: NSObject, NSApplicationDelegate {
         applyAppearance()
         tray.applySetting()
 
-        updateChecker = UpdateChecker()
-        tray.onRunUpdate = { [weak self] in self?.updateChecker.runSelfUpdate() }
-        updateChecker.onUpdateAvailable = { [weak self] version in
-            self?.tray.updateAvailable = version
+        if Bundle.main.bundleIdentifier != nil {
+            updaterController = SPUStandardUpdaterController(
+                startingUpdater: true, updaterDelegate: nil, userDriverDelegate: nil)
         }
-        updateChecker.start()
+        tray.onCheckForUpdates = { [weak self] in
+            self?.updaterController?.checkForUpdates(nil)
+        }
 
         // The first keychain read happens on a background queue: a pending
         // keychain permission prompt (common right after a re-signed build)
@@ -168,7 +172,6 @@ public final class AppDelegate: NSObject, NSApplicationDelegate {
 
     public func applicationWillTerminate(_ notification: Notification) {
         scheduler?.stop()
-        updateChecker?.stop()
         tray?.destroy()
     }
 

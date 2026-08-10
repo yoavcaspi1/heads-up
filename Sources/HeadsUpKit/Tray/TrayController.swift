@@ -9,11 +9,8 @@ final class TrayController: NSObject {
     private let onToggleCalendar: () -> Void
     private let onOpenSettings: () -> Void
 
-    /// Set by AppDelegate when the update checker finds a newer version;
-    /// surfaces an "Update to X…" item at the top of the right-click menu.
-    var updateAvailable: String?
-    var onRunUpdate: (() -> Void)?
     var onOpenSetupGuide: (() -> Void)?
+    var onCheckForUpdates: (() -> Void)?
 
     private var statusItem: NSStatusItem?
     private var tickTimer: Timer?
@@ -83,14 +80,6 @@ final class TrayController: NSObject {
         guard let item = statusItem else { return }
         let menu = NSMenu()
 
-        if let version = updateAvailable {
-            let update = NSMenuItem(title: "Update to \(version)…",
-                                    action: #selector(runUpdate), keyEquivalent: "")
-            update.target = self
-            menu.addItem(update)
-            menu.addItem(.separator())
-        }
-
         // Skip meeting: today's remaining meetings, checkmarked when already
         // skipped. Skipping hides the meeting from the menu bar title and
         // suppresses its alerts; clicking a checkmarked one un-skips it.
@@ -121,6 +110,10 @@ final class TrayController: NSObject {
         let guide = NSMenuItem(title: "Setup Guide…", action: #selector(openSetupGuide), keyEquivalent: "")
         guide.target = self
         menu.addItem(guide)
+        let update = NSMenuItem(title: "Check for Updates…",
+                                action: #selector(checkForUpdates), keyEquivalent: "")
+        update.target = self
+        menu.addItem(update)
         menu.addItem(.separator())
         let quit = NSMenuItem(title: "Quit Heads Up", action: #selector(NSApplication.terminate(_:)), keyEquivalent: "q")
         menu.addItem(quit)
@@ -147,8 +140,8 @@ final class TrayController: NSObject {
         onOpenSetupGuide?()
     }
 
-    @objc private func runUpdate() {
-        onRunUpdate?()
+    @objc private func checkForUpdates() {
+        onCheckForUpdates?()
     }
 
     private func tick() {

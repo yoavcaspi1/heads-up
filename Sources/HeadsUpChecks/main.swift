@@ -20,7 +20,6 @@ await trayModelTests()
 await calendarListModelTests()
 await settingsViewTests()
 await setupWizardModelTests()
-await updateCheckerTests()
 
 print("")
 print("passed \(TestRun.passed), failed \(TestRun.failed)")

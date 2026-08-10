@@ -38,14 +38,21 @@ fi
 APP_NAME="HeadsUp"
 APP_DISPLAY_NAME="Heads Up"
 BUNDLE_ID="com.yoavcaspi.headsup"
-SIGN_IDENTITY="HeadsUp Developer"
+# release.sh overrides these three for distributable builds.
+SIGN_IDENTITY="${HEADSUP_SIGN_IDENTITY:-HeadsUp Developer}"
+UNIVERSAL="${HEADSUP_UNIVERSAL:-false}"
+HARDENED="${HEADSUP_HARDENED:-false}"
 
 echo "==> Building Swift package ($CONFIG)..."
 # Only the app product: HeadsUpChecks needs -enable-testing on HeadsUpKit,
 # which is debug-only, so a plain `swift build -c release` cannot build it.
-swift build -c "$CONFIG" --product "$APP_NAME"
+ARCH_FLAGS=()
+if [[ "$UNIVERSAL" == "true" ]]; then
+    ARCH_FLAGS=(--arch arm64 --arch x86_64)
+fi
+swift build -c "$CONFIG" --product "$APP_NAME" ${ARCH_FLAGS[@]+"${ARCH_FLAGS[@]}"}
 
-BIN_PATH=$(swift build -c "$CONFIG" --show-bin-path)
+BIN_PATH=$(swift build -c "$CONFIG" ${ARCH_FLAGS[@]+"${ARCH_FLAGS[@]}"} --show-bin-path)
 EXEC_PATH="$BIN_PATH/$APP_NAME"
 
 if [[ ! -x "$EXEC_PATH" ]]; then
@@ -80,10 +87,18 @@ else
     echo "Warning: AppIcon.icns not found at Sources/HeadsUpKit/Resources/AppIcon.icns" >&2
 fi
 
-# Record where this bundle was built from (top-level Resources, where
-# Bundle.main resource lookup finds it). The in-app updater uses it to know
-# which checkout to `git pull` and rebuild.
-pwd > "$APP_BUNDLE/Contents/Resources/source_path.txt"
+# Embed Sparkle.framework (SPM ships it as a prebuilt universal artifact).
+SPARKLE_FW=$(find .build/artifacts -type d -name "Sparkle.framework" \
+    -not -path "*dSYM*" 2>/dev/null | head -1)
+if [[ -z "$SPARKLE_FW" ]]; then
+    echo "Error: Sparkle.framework not found under .build/artifacts (run swift build first)" >&2
+    exit 1
+fi
+mkdir -p "$APP_BUNDLE/Contents/Frameworks"
+cp -R "$SPARKLE_FW" "$APP_BUNDLE/Contents/Frameworks/"
+# The executable references @rpath/Sparkle...; point rpath at Frameworks.
+install_name_tool -add_rpath "@executable_path/../Frameworks" \
+    "$APP_BUNDLE/Contents/MacOS/$APP_NAME" 2>/dev/null || true
 
 # ============================================================================
 # Info.plist generation: marketing version from the VERSION file (also what
@@ -102,6 +117,14 @@ else
     BUILD_NUMBER=1
 fi
 echo "$BUILD_NUMBER" > "$BUILD_NUMBER_FILE"
+
+SPARKLE_KEY_XML=""
+if [[ -f "sparkle_public_key.txt" ]]; then
+    SPARKLE_KEY_XML="    <key>SUPublicEDKey</key>
+    <string>$(tr -d '[:space:]' < sparkle_public_key.txt)</string>"
+else
+    echo "Warning: sparkle_public_key.txt missing; update signatures will not verify" >&2
+fi
 
 echo "==> Writing Info.plist (version $SHORT_VERSION, build $BUILD_NUMBER)"
 cat > "$APP_BUNDLE/Contents/Info.plist" <<PLIST
@@ -130,6 +153,15 @@ cat > "$APP_BUNDLE/Contents/Info.plist" <<PLIST
     <key>LSMinimumSystemVersion</key>
     <string>14.0</string>
     <key>NSHighResolutionCapable</key>
+    <true/>
+    <key>SUFeedURL</key>
+    <string>https://raw.githubusercontent.com/yoavcaspi1/heads-up/main/appcast.xml</string>
+$SPARKLE_KEY_XML
+    <key>SUEnableAutomaticChecks</key>
+    <true/>
+    <key>SUScheduledCheckInterval</key>
+    <integer>21600</integer>
+    <key>SUAutomaticallyUpdate</key>
     <true/>
 </dict>
 </plist>
@@ -164,7 +196,20 @@ if ! codesign -f -s "$SIGN_IDENTITY" "$_sign_test" >/dev/null 2>&1; then
 fi
 rm -f "$_sign_test"
 
-codesign -f -s "$SIGN_IDENTITY" -i "$BUNDLE_ID" "$APP_BUNDLE"
+SIGN_FLAGS=(-f -s "$SIGN_IDENTITY")
+if [[ "$HARDENED" == "true" ]]; then
+    SIGN_FLAGS+=(-o runtime --timestamp)
+fi
+FW="$APP_BUNDLE/Contents/Frameworks/Sparkle.framework"
+if [[ -d "$FW" ]]; then
+    for xpc in "$FW/Versions/B/XPCServices/"*.xpc; do
+        [[ -d "$xpc" ]] && codesign "${SIGN_FLAGS[@]}" "$xpc"
+    done
+    [[ -f "$FW/Versions/B/Autoupdate" ]] && codesign "${SIGN_FLAGS[@]}" "$FW/Versions/B/Autoupdate"
+    [[ -d "$FW/Versions/B/Updater.app" ]] && codesign "${SIGN_FLAGS[@]}" "$FW/Versions/B/Updater.app"
+    codesign "${SIGN_FLAGS[@]}" "$FW"
+fi
+codesign "${SIGN_FLAGS[@]}" -i "$BUNDLE_ID" "$APP_BUNDLE"
 
 echo "==> Verifying code signature..."
 if codesign --verify --deep --strict --verbose=2 "$APP_BUNDLE" 2>&1; then

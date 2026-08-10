@@ -9,12 +9,19 @@ let package = Package(
     products: [
         .executable(name: "HeadsUp", targets: ["HeadsUp"])
     ],
+    dependencies: [
+        // Auto-updates for the downloadable build. The only dependency.
+        .package(url: "https://github.com/sparkle-project/Sparkle", from: "2.6.0")
+    ],
     targets: [
         // All app code lives here so it can be depended on both by the
         // HeadsUp executable and by HeadsUpChecks (no XCTest.framework on
         // this machine, so checks run as a plain executable instead).
         .target(
             name: "HeadsUpKit",
+            dependencies: [
+                .product(name: "Sparkle", package: "Sparkle")
+            ],
             path: "Sources/HeadsUpKit",
             resources: [
                 .copy("Resources")
