@@ -59,9 +59,12 @@ if strings "$APP/Contents/MacOS/HeadsUp" | grep -E "/Users/|CBD Dropbox"; then
     echo "Error: personal path leaked into the binary (see matches above)" >&2
     exit 1
 fi
-# Absolute rpaths from the build machine leak paths too; strip any.
-otool -l "$APP/Contents/MacOS/HeadsUp" | grep -A2 LC_RPATH | grep " path /" \
-    | awk '{print $2}' | while read -r rp; do
+# Personal absolute rpaths from the build machine leak paths too; strip
+# them (system rpaths like /usr/lib/swift are fine and stay). sort -u:
+# otool lists each rpath once per architecture, delete_rpath hits all
+# slices at once.
+otool -l "$APP/Contents/MacOS/HeadsUp" | grep -A2 LC_RPATH | grep " path /Users/" \
+    | awk '{print $2}' | sort -u | while read -r rp; do
     install_name_tool -delete_rpath "$rp" "$APP/Contents/MacOS/HeadsUp"
     echo "    stripped rpath $rp"
 done
