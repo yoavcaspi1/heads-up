@@ -116,13 +116,11 @@ if [[ -f "VERSION" ]]; then
     SHORT_VERSION=$(tr -d '[:space:]' < VERSION)
 fi
 
-BUILD_NUMBER_FILE="build_number.txt"
-if [[ -f "$BUILD_NUMBER_FILE" ]]; then
-    BUILD_NUMBER=$(($(cat "$BUILD_NUMBER_FILE") + 1))
-else
-    BUILD_NUMBER=1
-fi
-echo "$BUILD_NUMBER" > "$BUILD_NUMBER_FILE"
+# CFBundleVersion = git commit count: deterministic (same commit -> same
+# build number, including in release.sh's neutral clone), monotonically
+# increasing across releases, and what Sparkle compares via the appcast's
+# sparkle:version. Falls back to 1 outside a git checkout.
+BUILD_NUMBER=$(git rev-list --count HEAD 2>/dev/null || echo 1)
 
 SPARKLE_KEY_XML=""
 if [[ -f "sparkle_public_key.txt" ]]; then

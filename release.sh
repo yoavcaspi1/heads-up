@@ -105,6 +105,9 @@ else
 fi
 
 echo "==> Writing appcast.xml"
+# sparkle:version must be the numeric CFBundleVersion (Sparkle's comparison
+# key), not the marketing string; read it from the bundle actually built.
+BUILD_NUM=$(/usr/libexec/PlistBuddy -c "Print :CFBundleVersion" "$APP/Contents/Info.plist")
 PUBDATE=$(date -R)
 cat > appcast.xml <<APPCAST
 <?xml version="1.0" encoding="utf-8"?>
@@ -115,7 +118,7 @@ cat > appcast.xml <<APPCAST
       <title>Heads Up $VERSION</title>
       <pubDate>$PUBDATE</pubDate>
       <sparkle:shortVersionString>$VERSION</sparkle:shortVersionString>
-      <sparkle:version>$VERSION</sparkle:version>
+      <sparkle:version>$BUILD_NUM</sparkle:version>
       <sparkle:minimumSystemVersion>14.0</sparkle:minimumSystemVersion>
       <enclosure url="$FEED_URL_BASE/HeadsUp-$VERSION.zip" $ED_ATTRS type="application/octet-stream"/>
     </item>
