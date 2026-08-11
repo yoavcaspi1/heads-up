@@ -294,12 +294,30 @@ public final class AppDelegate: NSObject, NSApplicationDelegate {
     }
 }
 
+/// The SPM resource bundle, resolved safely for BOTH runtime shapes.
+/// `Bundle.module`'s generated accessor for CLI-built executables only
+/// checks the app-bundle ROOT (illegal for a signed app) and the absolute
+/// build-time path, then calls fatalError - which crashed every released
+/// build at launch the moment its /tmp build directory was gone (the dev
+/// checkout's .build masked this locally). Look in Contents/Resources,
+/// where build_app.sh actually puts the bundle, before ever touching
+/// Bundle.module; reach the accessor only in bare `swift run`/checks
+/// contexts, where its build-path fallback is valid.
+private let headsUpKitResources: Bundle = {
+    if let packaged = Bundle.main.resourceURL?
+        .appendingPathComponent("HeadsUp_HeadsUpKit.bundle"),
+       let bundle = Bundle(url: packaged) {
+        return bundle
+    }
+    return Bundle.module
+}()
+
 /// Registers the bundled Syne / DM Sans / DM Mono fonts with the font
 /// manager so YCDesignSystem.Typography resolves them. Safe to call when
 /// fonts are missing: the design system falls back to the system font.
 public func registerBundledFonts() {
-    guard let fontsURL = Bundle.module.url(forResource: "Resources/Fonts", withExtension: nil)
-        ?? Bundle.module.url(forResource: "Fonts", withExtension: nil) else { return }
+    guard let fontsURL = headsUpKitResources.url(forResource: "Resources/Fonts", withExtension: nil)
+        ?? headsUpKitResources.url(forResource: "Fonts", withExtension: nil) else { return }
     let urls = (try? FileManager.default.contentsOfDirectory(
         at: fontsURL, includingPropertiesForKeys: nil)) ?? []
     for url in urls where url.pathExtension.lowercased() == "ttf" {
