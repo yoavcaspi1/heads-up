@@ -1,0 +1,14 @@
+<?xml version="1.0" encoding="utf-8"?>
+<rss version="2.0" xmlns:sparkle="http://www.andymatuschak.org/xml-namespaces/sparkle">
+  <channel>
+    <title>Heads Up</title>
+    <item>
+      <title>Heads Up 1.3.0</title>
+      <pubDate>Tue, 11 Aug 2026 09:37:16 +0100</pubDate>
+      <sparkle:shortVersionString>1.3.0</sparkle:shortVersionString>
+      <sparkle:version>1.3.0</sparkle:version>
+      <sparkle:minimumSystemVersion>14.0</sparkle:minimumSystemVersion>
+      <enclosure url="https://github.com/yoavcaspi1/heads-up/releases/download/v1.3.0/HeadsUp-1.3.0.zip" sparkle:edSignature="bwrfJBd/81yVganDFTsShGm2Flwb8E7ewpjrYF9dxYB5tn0KiIhcBZHSJ5XmYmacWgXNqdDEGpfOOtBQnuGRAQ==" length="5217607" type="application/octet-stream"/>
+    </item>
+  </channel>
+</rss>
