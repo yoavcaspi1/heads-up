@@ -59,6 +59,7 @@ final class SettingsModel: ObservableObject {
     @Published var alertBlurIntensity: Int
     @Published var appearance: AppSettings.Appearance
     @Published var eventOpenTarget: AppSettings.EventOpenTarget
+    @Published var alertTitleFont: AppSettings.AlertTitleFont
 
     private let settingsStore: SettingsStore
     private let credentials: GoogleCredentialsStore
@@ -86,6 +87,7 @@ final class SettingsModel: ObservableObject {
         alertBlurIntensity = s.alertBlurIntensity
         appearance = s.appearance
         eventOpenTarget = s.eventOpenTarget
+        alertTitleFont = s.alertTitleFont
 
         configured = credentials.isConfigured
         savedClientId = credentials.credentials?.clientId
@@ -111,6 +113,7 @@ final class SettingsModel: ObservableObject {
         alertBlurIntensity = s.alertBlurIntensity
         appearance = s.appearance
         eventOpenTarget = s.eventOpenTarget
+        alertTitleFont = s.alertTitleFont
     }
 
     /// Called by SettingsWindowController each time the window is shown:
@@ -298,6 +301,10 @@ final class SettingsModel: ObservableObject {
 
     func setAppearance(_ value: AppSettings.Appearance) {
         settingsStore.update { $0.appearance = value }
+    }
+
+    func setAlertTitleFont(_ value: AppSettings.AlertTitleFont) {
+        settingsStore.update { $0.alertTitleFont = value }
     }
 
     func setEventOpenTarget(_ value: AppSettings.EventOpenTarget) {
@@ -618,6 +625,16 @@ struct SettingsView: View {
                             .frame(width: 160)
                             .accessibilityLabel("Blur tint")
                     }
+                }
+                settingsRow("Title font") {
+                    Picker("", selection: Binding(get: { model.alertTitleFont }, set: model.setAlertTitleFont)) {
+                        Text("Syne").tag(AppSettings.AlertTitleFont.syne)
+                        Text("DM Sans").tag(AppSettings.AlertTitleFont.dmSans)
+                    }
+                    .pickerStyle(.menu)
+                    .labelsHidden()
+                    .accessibilityLabel("Title font")
+                    .frame(width: 140)
                 }
                 settingsRow("App appearance") {
                     Picker("", selection: Binding(get: { model.appearance }, set: model.setAppearance)) {

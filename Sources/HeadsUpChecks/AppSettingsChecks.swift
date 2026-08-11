@@ -68,6 +68,16 @@ func appSettingsTests() async {
         try expect(!seen[0].alertsEnabled)
     }
 
+    await test("testAlertTitleFontDefaultsAndRoundtrip") {
+        // Settings written by versions without the field decode to Syne.
+        let legacy = try JSONDecoder().decode(AppSettings.self, from: Data("{}".utf8))
+        try expectEqual(legacy.alertTitleFont, .syne)
+        var s = AppSettings.defaults
+        s.alertTitleFont = .dmSans
+        let round = try JSONDecoder().decode(AppSettings.self, from: JSONEncoder().encode(s))
+        try expectEqual(round.alertTitleFont, .dmSans)
+    }
+
     await test("testCorruptFileFallsBackToDefaults") {
         let dir = FileManager.default.temporaryDirectory
             .appendingPathComponent("headsup-test-\(UUID().uuidString)")

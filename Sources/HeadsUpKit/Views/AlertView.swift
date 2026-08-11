@@ -13,6 +13,7 @@ func humanizeDuration(_ minutes: Int) -> String {
 struct AlertView: View {
     let event: CalendarEvent
     let snoozeDurations: [Int]
+    let titleFontChoice: AppSettings.AlertTitleFont
     let onJoin: () -> Void
     let onDismiss: () -> Void
     let onSnooze: (Int) -> Void
@@ -133,9 +134,10 @@ struct AlertView: View {
     /// Hero title size steps down with title length so any title fits fully.
     private var titleFont: Font {
         let count = event.title.count
-        if count > 110 { return YCDesignSystem.Typography.h1 }
-        if count > 55 { return YCDesignSystem.Typography.display }
-        return YCDesignSystem.Typography.displayXL
+        let syne = titleFontChoice == .syne
+        if count > 110 { return syne ? YCDesignSystem.Typography.h1 : YCDesignSystem.Typography.h1Sans }
+        if count > 55 { return syne ? YCDesignSystem.Typography.display : YCDesignSystem.Typography.displaySans }
+        return syne ? YCDesignSystem.Typography.displayXL : YCDesignSystem.Typography.displayXLSans
     }
 
     private func countdownLine(now: Date) -> String {

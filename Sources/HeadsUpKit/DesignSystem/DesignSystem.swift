@@ -130,6 +130,13 @@ public enum YCDesignSystem {
 
         public static let display = ycFont("Syne-ExtraBold", size: 40, weight: .heavy)
         public static let h1 = ycFont("Syne-SemiBold", size: 24, weight: .semibold)
+
+        /// DM Sans twins of the three display tiers the alert title steps
+        /// through, for the "Alert title font" setting (conventional
+        /// descenders instead of Syne's flat-chopped g/j).
+        public static let displayXLSans = ycFont("DMSans-Black", size: 64, weight: .black)
+        public static let displaySans = ycFont("DMSans-Black", size: 40, weight: .black)
+        public static let h1Sans = ycFont("DMSans-ExtraBold", size: 24, weight: .heavy)
         public static let h2 = ycFont("Syne-SemiBold", size: 20, weight: .semibold)
         public static let h3 = ycFont("Syne-SemiBold", size: 17, weight: .semibold)
         public static let h4 = ycFont("Syne-Medium", size: 15, weight: .medium)

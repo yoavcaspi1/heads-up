@@ -289,6 +289,7 @@ final class AlertWindowController {
         let root = AlertView(
             event: event,
             snoozeDurations: settings.snoozeDurations,
+            titleFontChoice: settings.alertTitleFont,
             onJoin: { [weak self] in
                 if let url = event.meetingUrl.flatMap(URL.init(string:)) {
                     NSWorkspace.shared.open(url)

@@ -199,10 +199,10 @@ public final class AppDelegate: NSObject, NSApplicationDelegate {
         }
     }
 
-    /// The two settings fields the on-screen alert actually renders.
+    /// The settings fields the on-screen alert actually renders.
     private var lastAlertAppearance: String?
     private func appearanceSignature(_ settings: AppSettings) -> String {
-        "\(settings.alertBackground.rawValue)-\(settings.alertBlurIntensity)"
+        "\(settings.alertBackground.rawValue)-\(settings.alertBlurIntensity)-\(settings.alertTitleFont.rawValue)"
     }
 
     private func applyAppearance() {

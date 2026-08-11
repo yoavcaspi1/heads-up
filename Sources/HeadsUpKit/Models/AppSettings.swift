@@ -9,6 +9,11 @@ struct AppSettings: Codable, Equatable {
     /// (the event's own web page), Apple Calendar at the event's time, or
     /// Notion Calendar on the event via its showEvent deep link.
     enum EventOpenTarget: String, Codable { case googleWeb, appleCalendar, notionCalendar }
+    /// Typeface for the full-screen alert title. Syne's heavy g/j descenders
+    /// are flat-chopped by the typeface's design; DM Sans is the
+    /// conventional-letterform alternative for people who read that as a
+    /// rendering bug.
+    enum AlertTitleFont: String, Codable { case syne, dmSans }
 
     /// Minutes before an event starts to fire each of the two alerts.
     var alertLeadTimes: [Int]
@@ -28,6 +33,8 @@ struct AppSettings: Codable, Equatable {
     var appearance: Appearance
     /// Which calendar app a clicked event opens in.
     var eventOpenTarget: EventOpenTarget
+    /// Typeface used for the alert hero title.
+    var alertTitleFont: AlertTitleFont
     /// Meetings the user skipped from the menu bar, keyed by schedulerKey
     /// (event id + start). A skipped meeting is hidden from the menu bar
     /// title and fires no alerts. Pruned by the scheduler once the event
@@ -47,6 +54,7 @@ struct AppSettings: Codable, Equatable {
         alertBlurIntensity: 30,
         appearance: .system,
         eventOpenTarget: .googleWeb,
+        alertTitleFont: .syne,
         skippedEvents: []
     )
 
@@ -86,6 +94,7 @@ struct AppSettings: Codable, Equatable {
         self.alertBlurIntensity = (try? c.decode(Int.self, forKey: .alertBlurIntensity)) ?? d.alertBlurIntensity
         self.appearance = (try? c.decode(Appearance.self, forKey: .appearance)) ?? d.appearance
         self.eventOpenTarget = (try? c.decode(EventOpenTarget.self, forKey: .eventOpenTarget)) ?? d.eventOpenTarget
+        self.alertTitleFont = (try? c.decode(AlertTitleFont.self, forKey: .alertTitleFont)) ?? d.alertTitleFont
         self.skippedEvents = (try? c.decode([String].self, forKey: .skippedEvents)) ?? d.skippedEvents
         self = AppSettings.sanitized(from: self)
     }
@@ -93,7 +102,8 @@ struct AppSettings: Codable, Equatable {
     init(alertLeadTimes: [Int], snoozeDurations: [Int], alertsEnabled: Bool,
          disabledCalendars: [String], menuBarCalendarEnabled: Bool,
          alertBackground: AlertBackground, alertBlurIntensity: Int, appearance: Appearance,
-         eventOpenTarget: EventOpenTarget = .googleWeb, skippedEvents: [String] = []) {
+         eventOpenTarget: EventOpenTarget = .googleWeb, alertTitleFont: AlertTitleFont = .syne,
+         skippedEvents: [String] = []) {
         self.alertLeadTimes = alertLeadTimes
         self.snoozeDurations = snoozeDurations
         self.alertsEnabled = alertsEnabled
@@ -103,6 +113,7 @@ struct AppSettings: Codable, Equatable {
         self.alertBlurIntensity = alertBlurIntensity
         self.appearance = appearance
         self.eventOpenTarget = eventOpenTarget
+        self.alertTitleFont = alertTitleFont
         self.skippedEvents = skippedEvents
     }
 }
