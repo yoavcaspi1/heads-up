@@ -96,39 +96,43 @@ struct AlertView: View {
                     .font(.system(size: 22))
                     .foregroundStyle(YCDesignSystem.Colors.textSecondary))
 
+            // Join and Dismiss are one fixed-size pair: same width, height
+            // and corner radius, differing only in fill (primary vs
+            // secondary). Dismiss becomes the primary when there is nothing
+            // to join.
             VStack(spacing: YCDesignSystem.Spacing.smd) {
                 if event.meetingUrl != nil {
-                    Button(action: onJoin) {
-                        Label("Join meeting", systemImage: "video")
-                            .font(YCDesignSystem.Typography.button)
-                            .foregroundStyle(YCDesignSystem.Colors.textOnAccent)
-                            .padding(.horizontal, YCDesignSystem.Spacing.lg)
-                            .frame(height: 44)
-                            .background(YCDesignSystem.Colors.accent)
-                            .clipShape(RoundedRectangle(cornerRadius: YCDesignSystem.CornerRadius.medium))
-                    }
-                    .buttonStyle(.plain)
+                    actionButton("Join meeting", icon: "video", primary: true, action: onJoin)
                 }
-                Button(action: onDismiss) {
-                    Text("Dismiss")
-                        .font(YCDesignSystem.Typography.button)
-                        .foregroundStyle(event.meetingUrl != nil
-                            ? YCDesignSystem.Colors.textPrimary
-                            : YCDesignSystem.Colors.textOnAccent)
-                        .frame(minWidth: 208)
-                        .frame(height: 44)
-                        .background(event.meetingUrl != nil
-                            ? AnyShapeStyle(Color.clear)
-                            : AnyShapeStyle(YCDesignSystem.Colors.accent))
-                        .overlay(RoundedRectangle(cornerRadius: YCDesignSystem.CornerRadius.medium)
-                            .stroke(event.meetingUrl != nil
-                                ? YCDesignSystem.Colors.borderStrong : Color.clear, lineWidth: 1))
-                        .clipShape(RoundedRectangle(cornerRadius: YCDesignSystem.CornerRadius.medium))
-                }
-                .buttonStyle(.plain)
+                actionButton("Dismiss", icon: nil, primary: event.meetingUrl == nil, action: onDismiss)
             }
             .padding(.top, YCDesignSystem.Spacing.sm)
         }
+    }
+
+    private static let actionButtonWidth: CGFloat = 240
+    private static let actionButtonHeight: CGFloat = 44
+
+    private func actionButton(_ title: String, icon: String?, primary: Bool,
+                              action: @escaping () -> Void) -> some View {
+        let shape = RoundedRectangle(cornerRadius: YCDesignSystem.CornerRadius.medium)
+        return Button(action: action) {
+            HStack(spacing: YCDesignSystem.Spacing.xs) {
+                if let icon {
+                    Image(systemName: icon)
+                }
+                Text(title)
+            }
+            .font(YCDesignSystem.Typography.button)
+            .foregroundStyle(primary ? YCDesignSystem.Colors.textOnAccent : YCDesignSystem.Colors.textPrimary)
+            .frame(width: Self.actionButtonWidth, height: Self.actionButtonHeight)
+            .background(primary
+                ? AnyShapeStyle(YCDesignSystem.Colors.accent)
+                : AnyShapeStyle(YCDesignSystem.Colors.surfaceAlt))
+            .overlay(shape.stroke(primary ? Color.clear : YCDesignSystem.Colors.borderStrong, lineWidth: 1))
+            .clipShape(shape)
+        }
+        .buttonStyle(.plain)
     }
 
     /// Hero title size steps down with title length so any title fits fully.
