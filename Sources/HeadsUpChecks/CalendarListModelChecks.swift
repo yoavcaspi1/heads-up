@@ -35,6 +35,36 @@ func calendarListModelTests() async {
         try expectEqual(label, expectedFormatter.string(from: fixedDate))
     }
 
+    await test("testScrollTargetPrefersRequestedEvent") {
+        let today = calendarListChecksEvent("Today", dayOffset: 0)
+        let tomorrow = calendarListChecksEvent("Tomorrow", dayOffset: 1)
+        let sections = CalendarListModel.bucketed([today, tomorrow], today: calendarListChecksNow, calendar: .current)
+        let request = CalendarScrollRequest(eventKey: tomorrow.schedulerKey)
+        try expectEqual(CalendarListModel.scrollTargetId(for: request, sections: sections),
+                        CalendarListModel.rowId(forEventKey: tomorrow.schedulerKey))
+    }
+
+    await test("testScrollTargetFallsBackToTodayAnchor") {
+        let yesterday = calendarListChecksEvent("Yesterday", dayOffset: -1)
+        let dayAfter = calendarListChecksEvent("DayAfter", dayOffset: 2)
+        let sections = CalendarListModel.bucketed([yesterday, dayAfter], today: calendarListChecksNow, calendar: .current)
+        // No request at all, and a request for an event no longer cached:
+        // both land on the first section at or after today, never on the
+        // past.
+        try expectEqual(CalendarListModel.scrollTargetId(for: nil, sections: sections),
+                        CalendarListModel.sectionId(forDayOffset: 2))
+        let stale = CalendarScrollRequest(eventKey: "gone@0")
+        try expectEqual(CalendarListModel.scrollTargetId(for: stale, sections: sections),
+                        CalendarListModel.sectionId(forDayOffset: 2))
+        try expectNil(CalendarListModel.scrollTargetId(for: nil, sections: []))
+    }
+
+    await test("testScrollRequestsAreDistinct") {
+        // Same target twice must still compare unequal so onChange fires
+        // on a re-open.
+        try expect(CalendarScrollRequest(eventKey: "a@1") != CalendarScrollRequest(eventKey: "a@1"))
+    }
+
     await test("testBucketingExcludesBeyondOneWeek") {
         // Calls the real static bucketing function directly (extracted from
         // CalendarListModel.sections), since building a full model needs a

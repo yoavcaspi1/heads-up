@@ -6,7 +6,9 @@ import AppKit
 final class TrayController: NSObject {
     private let scheduler: Scheduler
     private let settingsStore: SettingsStore
-    private let onToggleCalendar: () -> Void
+    /// Called with the meeting the menu bar title currently shows (nil in
+    /// the icon-only state) so the calendar can open scrolled to it.
+    private let onToggleCalendar: (CalendarEvent?) -> Void
     private let onOpenSettings: () -> Void
 
     var onOpenSetupGuide: (() -> Void)?
@@ -21,7 +23,7 @@ final class TrayController: NSObject {
     private static let doneColor = YCDesignSystemNSColor.sage
 
     init(scheduler: Scheduler, settingsStore: SettingsStore,
-         onToggleCalendar: @escaping () -> Void, onOpenSettings: @escaping () -> Void) {
+         onToggleCalendar: @escaping (CalendarEvent?) -> Void, onOpenSettings: @escaping () -> Void) {
         self.scheduler = scheduler
         self.settingsStore = settingsStore
         self.onToggleCalendar = onToggleCalendar
@@ -65,7 +67,9 @@ final class TrayController: NSObject {
         if event.type == .rightMouseUp || event.modifierFlags.contains(.control) {
             showMenu()
         } else {
-            onToggleCalendar()
+            // Same source as the title (trayEvents, so a skipped meeting is
+            // never the focus): whatever the bar names is what opens on top.
+            onToggleCalendar(TrayModel.focusEvent(scheduler.trayEvents, now: Date(), calendar: .current))
         }
     }
 

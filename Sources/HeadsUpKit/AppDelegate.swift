@@ -66,7 +66,7 @@ public final class AppDelegate: NSObject, NSApplicationDelegate {
                                   DispatchQueue.main.async { self?.alerts.show(event) }
                               })
         tray = TrayController(scheduler: scheduler, settingsStore: settingsStore,
-                              onToggleCalendar: { [weak self] in self?.toggleMainWindow() },
+                              onToggleCalendar: { [weak self] event in self?.toggleMainWindow(focusing: event) },
                               onOpenSettings: { [weak self] in self?.openSettings() })
         applyAppearance()
         tray.applySetting()
@@ -240,10 +240,12 @@ public final class AppDelegate: NSObject, NSApplicationDelegate {
         NSApp.mainMenu = mainMenu
     }
 
-    func toggleMainWindow() {
+    /// `event` is the meeting the menu bar title shows; the calendar opens
+    /// scrolled to it, or to today when nil.
+    func toggleMainWindow(focusing event: CalendarEvent? = nil) {
         // nil only in the short window before the background credentials
         // preload finishes launching the window controllers.
-        mainWindow?.toggle()
+        mainWindow?.toggle(focusing: event)
     }
 
     func openSettings() {

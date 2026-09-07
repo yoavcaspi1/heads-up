@@ -1,11 +1,25 @@
 import SwiftUI
 import AppKit
 
+/// One "scroll the list" request. A fresh `id` per request means the same
+/// target twice in a row (open, close, open again) still fires onChange.
+struct CalendarScrollRequest: Equatable {
+    let id: UUID
+    /// Scheduler key of the event to put at the top; nil scrolls to today.
+    let eventKey: String?
+
+    init(eventKey: String?) {
+        self.id = UUID()
+        self.eventKey = eventKey
+    }
+}
+
 final class CalendarListModel: ObservableObject {
     @Published var events: [CalendarEvent] = []
     @Published var configured = false
     @Published var connected = false
     @Published var needsReconnect = false
+    @Published var scrollRequest: CalendarScrollRequest?
 
     private let scheduler: Scheduler
     private let registry: GoogleAccountsRegistry
@@ -26,6 +40,31 @@ final class CalendarListModel: ObservableObject {
         connected = configured && registry.hasAccounts
         needsReconnect = registry.anyAccountNeedsReconnect
     }
+
+    /// Ask the list to scroll `event` to the top (today when nil).
+    func requestScroll(to event: CalendarEvent?) {
+        scrollRequest = CalendarScrollRequest(eventKey: event?.schedulerKey)
+    }
+
+    /// Resolves a request to the row id the list should scroll to, or nil
+    /// when there is nothing to scroll to. An event that has since dropped
+    /// out of the cache falls back to today. Pure, so checks can cover it.
+    static func scrollTargetId(for request: CalendarScrollRequest?,
+                               sections: [(dayOffset: Int, date: Date, events: [CalendarEvent])]) -> String? {
+        if let key = request?.eventKey,
+           sections.contains(where: { $0.events.contains { $0.schedulerKey == key } }) {
+            return Self.rowId(forEventKey: key)
+        }
+        // Anchor the FIRST section at or after today, not just dayOffset == 0:
+        // when today has no events, there is no dayOffset == 0 section, and
+        // without a fallback the initial scroll lands on the top of the list
+        // (last week) instead of the nearest upcoming day.
+        guard let anchor = sections.first(where: { $0.dayOffset >= 0 })?.dayOffset else { return nil }
+        return Self.sectionId(forDayOffset: anchor)
+    }
+
+    static func rowId(forEventKey key: String) -> String { "event-\(key)" }
+    static func sectionId(forDayOffset offset: Int) -> String { "day-\(offset)" }
 
     /// Events within one week either side, bucketed by local day, ascending.
     var sections: [(dayOffset: Int, date: Date, events: [CalendarEvent])] {
@@ -67,8 +106,6 @@ struct CalendarListView: View {
     let onOpenEvent: (CalendarEvent) -> Void
     @ObservedObject var model: CalendarListModel
     let onOpenSettings: () -> Void
-
-    @State private var didScrollToToday = false
 
     var body: some View {
         VStack(spacing: 0) {
@@ -170,29 +207,33 @@ struct CalendarListView: View {
     // MARK: - Events list
 
     private var eventsList: some View {
-        // Anchor the FIRST section at or after today, not just dayOffset == 0:
-        // when today has no events, there is no dayOffset == 0 section, and
-        // without a fallback the initial scroll lands on the top of the list
-        // (last week) instead of the nearest upcoming day.
-        let anchorOffset = model.sections.first { $0.dayOffset >= 0 }?.dayOffset
-        return ScrollViewReader { proxy in
+        ScrollViewReader { proxy in
             ScrollView {
-                LazyVStack(alignment: .leading, spacing: YCDesignSystem.Spacing.md) {
+                // A plain VStack, not Lazy: scrollTo needs the target row to
+                // exist in the layout, and rows are nested inside sections a
+                // lazy stack may not have built yet. Two weeks of events is
+                // small enough that eager layout costs nothing noticeable.
+                VStack(alignment: .leading, spacing: YCDesignSystem.Spacing.md) {
                     ForEach(model.sections, id: \.dayOffset) { section in
                         sectionView(section)
-                            .id(section.dayOffset == anchorOffset ? "today-anchor" : "day-\(section.dayOffset)")
+                            .id(CalendarListModel.sectionId(forDayOffset: section.dayOffset))
                     }
                 }
                 .padding(.horizontal, YCDesignSystem.Spacing.md)
                 .padding(.bottom, YCDesignSystem.Spacing.md)
             }
-            .onAppear {
-                guard !didScrollToToday else { return }
-                didScrollToToday = true
-                DispatchQueue.main.async {
-                    proxy.scrollTo("today-anchor", anchor: .top)
-                }
-            }
+            // First open: the request was filed before this view existed.
+            .onAppear { scroll(proxy, to: model.scrollRequest) }
+            // Every later open: the window is hidden, not destroyed, so the
+            // view stays alive and only the request changes.
+            .onChange(of: model.scrollRequest) { _, request in scroll(proxy, to: request) }
+        }
+    }
+
+    private func scroll(_ proxy: ScrollViewProxy, to request: CalendarScrollRequest?) {
+        guard let target = CalendarListModel.scrollTargetId(for: request, sections: model.sections) else { return }
+        DispatchQueue.main.async {
+            proxy.scrollTo(target, anchor: .top)
         }
     }
 
@@ -205,8 +246,12 @@ struct CalendarListView: View {
                 .foregroundStyle(isToday ? YCDesignSystem.Colors.accent : YCDesignSystem.Colors.textMuted)
                 .padding(.top, YCDesignSystem.Spacing.sm)
             VStack(spacing: YCDesignSystem.Spacing.xs) {
-                ForEach(section.events) { event in
+                // schedulerKey, not id: a recurring series shares one id
+                // across its instances, and the scroll target is keyed the
+                // same way.
+                ForEach(section.events, id: \.schedulerKey) { event in
                     EventRow(event: event, isToday: isToday, onOpen: onOpenEvent)
+                        .id(CalendarListModel.rowId(forEventKey: event.schedulerKey))
                 }
             }
         }
