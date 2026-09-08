@@ -20,6 +20,19 @@ Internal notes for the maintainer. Friends never need this file.
    `echo "PASTE_PUBLIC_KEY" > sparkle_public_key.txt` and commit that
    file (public keys are safe to publish).
 
+4. **Bundled Google OAuth client.** Release builds refuse to build
+   without one. Put the Desktop-app client from the Heads Up Google
+   Cloud project in `~/.config/headsup/google-oauth-client.env`
+   (mode 600, never committed):
+   ```
+   HEADSUP_GOOGLE_CLIENT_ID=...apps.googleusercontent.com
+   HEADSUP_GOOGLE_CLIENT_SECRET=GOCSPX-...
+   ```
+   `build_app.sh` writes both into Info.plist. The project's consent
+   screen must be **published to production** (Google Auth Platform >
+   Audience), otherwise sign-ins expire after 7 days and only listed
+   test users can connect.
+
 ## Every release
 
 1. Make the changes; run `swift run HeadsUpChecks` until green.

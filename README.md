@@ -23,20 +23,25 @@ number of minutes before each meeting.
 2. Open it and drag **Heads Up** into the **Applications** folder.
 3. Open Heads Up from Applications. Look for the bell icon in the menu
    bar, at the top right of the screen.
+4. The Setup Guide opens by itself. Press **Sign in with Google** and
+   pick the account whose calendar you want alerts for.
 
-On first launch the app opens a **Setup Guide** that walks you through
-connecting your Google Calendar. It takes about 10 minutes, once. The
-guide is also available any time: right-click the bell icon and choose
-"Setup Guide…".
+Google may show a "Google hasn't verified this app" page. That is
+normal for a small app like this one: click **Advanced**, then
+**Go to Heads Up (unsafe)**, then **Allow**. Heads Up only reads your
+calendar; it never changes anything.
 
-Requires macOS 14 (Sonoma) or later. No Terminal, no other installs.
+That is the whole setup, about a minute. More accounts can be added any
+time from Settings (right-click the bell). Requires macOS 14 (Sonoma) or
+later. No Terminal, no other installs.
 
-## Google setup, step by step
+## Advanced: use your own Google client
 
-The in-app Setup Guide covers all of this interactively; this is the
-same walkthrough in written form. Heads Up connects through your own
-Google OAuth client, so your calendar data never goes through anyone
-else's account; there is no shared/bundled client ID.
+Heads Up ships with its own Google OAuth client so nobody has to touch
+the Google Cloud console. If you would rather sign in through a client
+that belongs to you (your own Google Cloud project), Settings > Google
+connection > **Use my own client…** takes a client ID and secret, and
+the Setup Guide switches to the long form. Steps, for reference:
 
 1. **Create a Google Cloud project** at
    https://console.cloud.google.com/projectcreate. Any name. Free.
@@ -50,13 +55,10 @@ else's account; there is no shared/bundled client ID.
    in Testing mode Google disconnects the app every 7 days.
 4. **Create credentials** at
    https://console.cloud.google.com/apis/credentials/oauthclient:
-   type "Desktop app". Copy the Client ID and Client secret into the
-   app's Setup Guide (or Settings > Google connection).
-5. **Sign in** from the Setup Guide. Google shows an "unverified app"
-   warning because the project is yours and brand new: click Advanced,
-   then "Go to Heads Up (unsafe)", then allow calendar access. Repeat
-   for each Google account you want alerts from; the client ID/secret
-   is shared across all accounts added this way.
+   type "Desktop app". Copy the Client ID and Client secret into
+   Settings > Google connection.
+5. **Sign in** as above. Removing your own client in Settings returns
+   the app to the built-in one.
 
 During sign-in, Heads Up opens your default browser to Google's consent
 screen and receives the redirect on a one-shot, loopback-only listener
@@ -78,8 +80,9 @@ manually, right-click the bell icon and choose "Check for Updates…".
     per-account state (reconnect-needed flags, etc.). Tokens themselves are
     not in this file.
   - `setup_wizard.json` — how far the Setup Guide got, so it can resume.
-- **OAuth client secret and per-account tokens**: macOS Keychain, service
-  name `com.eloryo.headsup` (generic-password items). Installs predating the
+- **Per-account tokens, and your own OAuth client if you entered one**:
+  macOS Keychain, service name `com.eloryo.headsup` (generic-password
+  items). The built-in client lives in the app's Info.plist. Installs predating the
   rename hold their items under `com.cedoreholdings.headsup`; the app moves
   them across silently on first launch of a version that has this change,
   then deletes the old items.

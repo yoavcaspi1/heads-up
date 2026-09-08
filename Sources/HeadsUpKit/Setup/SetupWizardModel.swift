@@ -26,29 +26,57 @@ public final class SetupWizardModel: ObservableObject {
     private let stateURL: URL
     private let saveCredentials: (String, String) -> Void
     private let credentialsConfigured: () -> Bool
+    /// True when the app ships its own OAuth client: the four Google Cloud
+    /// console pages are skipped and the guide is welcome, sign in, done.
+    public let bundledClientAvailable: Bool
+    /// The pages this run of the guide walks through, in order.
+    public let steps: [SetupStep]
 
     private struct PersistedState: Codable { var step: Int }
 
     public init(stateURL: URL,
                 saveCredentials: @escaping (String, String) -> Void,
-                credentialsConfigured: @escaping () -> Bool) {
+                credentialsConfigured: @escaping () -> Bool,
+                bundledClientAvailable: Bool = false) {
         self.stateURL = stateURL
         self.saveCredentials = saveCredentials
         self.credentialsConfigured = credentialsConfigured
+        self.bundledClientAvailable = bundledClientAvailable
+        let steps: [SetupStep] = bundledClientAvailable ? [.welcome, .signIn, .done] : SetupStep.allCases
+        self.steps = steps
+        // A persisted step that this flow does not contain (e.g. a console
+        // page saved by a build without a bundled client) restarts at
+        // welcome rather than stranding the guide on a page it cannot show.
         if let data = try? Data(contentsOf: stateURL),
            let persisted = try? JSONDecoder().decode(PersistedState.self, from: data),
-           let restored = SetupStep(rawValue: persisted.step) {
+           let restored = SetupStep(rawValue: persisted.step),
+           steps.contains(restored) {
             step = restored
         } else {
             step = .welcome
         }
     }
 
-    /// The wizard self-opens only until client credentials exist; after
-    /// that the tray menu's "Setup Guide" is the way back in.
-    public static func shouldAutoShow(credentialsConfigured: Bool) -> Bool {
-        !credentialsConfigured
+    /// The guide self-opens until the app can actually alert: a usable
+    /// client and at least one connected account. A guide the user already
+    /// finished (or skipped out of) never nags again; the tray menu's
+    /// "Setup Guide" is the way back in.
+    public static func shouldAutoShow(credentialsConfigured: Bool, hasAccounts: Bool,
+                                      finishedBefore: Bool) -> Bool {
+        !finishedBefore && !(credentialsConfigured && hasAccounts)
     }
+
+    public var finished: Bool { step == .done }
+
+    /// 1-based position of the current page for the "Step x of y" header;
+    /// the done page counts as the last numbered step.
+    public var stepNumber: Int {
+        min(stepIndex + 1, stepCount)
+    }
+
+    public var stepCount: Int { steps.count - 1 }
+
+    private var stepIndex: Int { steps.firstIndex(of: step) ?? 0 }
 
     public static func isValidClientId(_ raw: String) -> Bool {
         let value = raw.trimmingCharacters(in: .whitespacesAndNewlines)
@@ -90,7 +118,8 @@ public final class SetupWizardModel: ObservableObject {
     }
 
     public func advance() {
-        guard canAdvance, let next = SetupStep(rawValue: step.rawValue + 1) else { return }
+        guard canAdvance, stepIndex + 1 < steps.count else { return }
+        let next = steps[stepIndex + 1]
         if step == .createClient {
             saveCredentials(
                 clientId.trimmingCharacters(in: .whitespacesAndNewlines),
@@ -102,7 +131,8 @@ public final class SetupWizardModel: ObservableObject {
     }
 
     public func goBack() {
-        guard let previous = SetupStep(rawValue: step.rawValue - 1) else { return }
+        guard stepIndex > 0 else { return }
+        let previous = steps[stepIndex - 1]
         errorMessage = nil
         step = previous
         persist()

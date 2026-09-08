@@ -56,10 +56,12 @@ final class SettingsModel: ObservableObject {
     // MARK: Appearance
 
     @Published var alertBackground: AppSettings.AlertBackground
-    @Published var alertBlurIntensity: Int
     @Published var appearance: AppSettings.Appearance
     @Published var eventOpenTarget: AppSettings.EventOpenTarget
     @Published var alertTitleFont: AppSettings.AlertTitleFont
+    /// Sign-in goes through the client bundled with the app; the user has
+    /// not pasted their own.
+    @Published var usesBundledClient: Bool
 
     private let settingsStore: SettingsStore
     private let credentials: GoogleCredentialsStore
@@ -84,12 +86,12 @@ final class SettingsModel: ObservableObject {
         alertLeadTimes = s.alertLeadTimes
         snoozeDurations = s.snoozeDurations
         alertBackground = s.alertBackground
-        alertBlurIntensity = s.alertBlurIntensity
         appearance = s.appearance
         eventOpenTarget = s.eventOpenTarget
         alertTitleFont = s.alertTitleFont
 
         configured = credentials.isConfigured
+        usesBundledClient = credentials.usesBundledClient
         savedClientId = credentials.credentials?.clientId
         credentialsInvalid = registry.credentialsInvalid
         accounts = registry.listAccounts()
@@ -110,7 +112,6 @@ final class SettingsModel: ObservableObject {
         alertLeadTimes = s.alertLeadTimes
         snoozeDurations = s.snoozeDurations
         alertBackground = s.alertBackground
-        alertBlurIntensity = s.alertBlurIntensity
         appearance = s.appearance
         eventOpenTarget = s.eventOpenTarget
         alertTitleFont = s.alertTitleFont
@@ -121,6 +122,7 @@ final class SettingsModel: ObservableObject {
     /// reloads the calendar list.
     func onWindowShow() {
         configured = credentials.isConfigured
+        usesBundledClient = credentials.usesBundledClient
         savedClientId = credentials.credentials?.clientId
         credentialsInvalid = registry.credentialsInvalid
         accounts = registry.listAccounts()
@@ -149,6 +151,7 @@ final class SettingsModel: ObservableObject {
         clientIdInput = ""
         clientSecretInput = ""
         configured = credentials.isConfigured
+        usesBundledClient = credentials.usesBundledClient
         savedClientId = credentials.credentials?.clientId
         credentialsInvalid = registry.credentialsInvalid
         Task {
@@ -173,6 +176,7 @@ final class SettingsModel: ObservableObject {
         calendars = []
         accountsError = nil
         configured = credentials.isConfigured
+        usesBundledClient = credentials.usesBundledClient
         savedClientId = nil
         credentialsInvalid = registry.credentialsInvalid
         Task { await scheduler.refresh() }
@@ -295,9 +299,6 @@ final class SettingsModel: ObservableObject {
         settingsStore.update { $0.alertBackground = value }
     }
 
-    func setAlertBlurIntensity(_ value: Int) {
-        settingsStore.update { $0.alertBlurIntensity = value }
-    }
 
     func setAppearance(_ value: AppSettings.Appearance) {
         settingsStore.update { $0.appearance = value }
@@ -321,11 +322,9 @@ final class SettingsModel: ObservableObject {
 struct SettingsView: View {
     @ObservedObject var model: SettingsModel
 
-    /// Local drag value for the blur-intensity slider. nil when not
-    /// dragging, so the slider reflects the model's persisted value.
-    /// Persisting (and the reschedule it triggers) only happens once
-    /// dragging ends, not on every intermediate step.
-    @State private var draggingBlurIntensity: Double?
+    /// Reveals the paste-your-own-client fields on top of the bundled
+    /// client; off until the user asks for them.
+    @State private var showCustomClientFields = false
 
     private let setupSteps = "Create a Google Cloud project (or reuse an existing one), enable the Calendar API, then create an OAuth client of type Desktop app. Paste its client ID and secret below."
 
@@ -396,7 +395,7 @@ struct SettingsView: View {
                         background: YCDesignSystem.Colors.dangerBg,
                         foreground: YCDesignSystem.Colors.dangerText)
                 }
-                if model.configured {
+                if model.configured && !model.usesBundledClient {
                     HStack {
                         Text(truncatedMiddle(model.savedClientId ?? ""))
                             .font(YCDesignSystem.Typography.code)
@@ -404,7 +403,22 @@ struct SettingsView: View {
                             .lineLimit(1)
                             .truncationMode(.middle)
                         Spacer()
-                        destructiveOutlineButton("Remove") { model.clearCredentials() }
+                        destructiveOutlineButton("Remove") {
+                            model.clearCredentials()
+                            showCustomClientFields = false
+                        }
+                    }
+                } else if model.usesBundledClient && !showCustomClientFields {
+                    HStack(alignment: .top, spacing: YCDesignSystem.Spacing.sm) {
+                        Text("Using the Google connection built into Heads Up. Just add your account below.")
+                            .font(YCDesignSystem.Typography.bodySmall)
+                            .foregroundStyle(YCDesignSystem.Colors.textSecondary)
+                            .fixedSize(horizontal: false, vertical: true)
+                        Spacer()
+                        Button("Use my own client…") { showCustomClientFields = true }
+                            .buttonStyle(.plain)
+                            .font(YCDesignSystem.Typography.label)
+                            .foregroundStyle(YCDesignSystem.Colors.link)
                     }
                 } else {
                     callout(setupSteps,
@@ -610,21 +624,6 @@ struct SettingsView: View {
                     .labelsHidden()
                     .accessibilityLabel("Background")
                     .frame(width: 140)
-                }
-                if model.alertBackground == .blur {
-                    settingsRow("Blur tint") {
-                        Slider(value: Binding(
-                            get: { draggingBlurIntensity ?? Double(model.alertBlurIntensity) },
-                            set: { draggingBlurIntensity = $0 }),
-                            in: 0...100, step: 1,
-                            onEditingChanged: { editing in
-                                guard !editing, let value = draggingBlurIntensity else { return }
-                                model.setAlertBlurIntensity(Int(value.rounded()))
-                                draggingBlurIntensity = nil
-                            })
-                            .frame(width: 160)
-                            .accessibilityLabel("Blur tint")
-                    }
                 }
                 settingsRow("Title font") {
                     Picker("", selection: Binding(get: { model.alertTitleFont }, set: model.setAlertTitleFont)) {

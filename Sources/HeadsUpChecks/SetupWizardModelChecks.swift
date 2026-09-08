@@ -112,8 +112,57 @@ func setupWizardModelTests() async {
     }
 
     await test("testShouldAutoShow") {
-        try expect(SetupWizardModel.shouldAutoShow(credentialsConfigured: false))
-        try expect(!SetupWizardModel.shouldAutoShow(credentialsConfigured: true))
+        // Fresh install with a bundled client: configured but no account yet.
+        try expect(SetupWizardModel.shouldAutoShow(credentialsConfigured: true, hasAccounts: false, finishedBefore: false))
+        // Fresh install without one.
+        try expect(SetupWizardModel.shouldAutoShow(credentialsConfigured: false, hasAccounts: false, finishedBefore: false))
+        // Fully set up.
+        try expect(!SetupWizardModel.shouldAutoShow(credentialsConfigured: true, hasAccounts: true, finishedBefore: false))
+        // Skipped sign-in earlier: never nag again.
+        try expect(!SetupWizardModel.shouldAutoShow(credentialsConfigured: true, hasAccounts: false, finishedBefore: true))
+    }
+
+    await test("testBundledClientFlowIsWelcomeSignInDone") {
+        let model = SetupWizardModel(stateURL: tempStateURL(),
+                                     saveCredentials: { _, _ in },
+                                     credentialsConfigured: { true },
+                                     bundledClientAvailable: true)
+        try expectEqual(model.steps, [.welcome, .signIn, .done])
+        try expectEqual(model.stepCount, 2)
+        try expectEqual(model.stepNumber, 1)
+        model.advance()
+        try expectEqual(model.step, .signIn)
+        try expectEqual(model.stepNumber, 2)
+        try expect(!model.canAdvance)
+        model.goBack()
+        try expectEqual(model.step, .welcome)
+        model.advance()
+        model.markSignedIn()
+        model.advance()
+        try expectEqual(model.step, .done)
+        try expect(model.finished)
+        try expectEqual(model.stepNumber, 2)
+    }
+
+    await test("testFullFlowStepNumbering") {
+        let model = SetupWizardModel(stateURL: tempStateURL(),
+                                     saveCredentials: { _, _ in },
+                                     credentialsConfigured: { false })
+        try expectEqual(model.stepCount, 6)
+        model.advance(); model.advance(); model.advance(); model.advance()
+        try expectEqual(model.step, .createClient)
+        try expectEqual(model.stepNumber, 5)
+    }
+
+    await test("testPersistedConsoleStepRestartsInBundledFlow") {
+        // State saved by a build without a bundled client, mid-console.
+        let url = tempStateURL()
+        let old = SetupWizardModel(stateURL: url, saveCredentials: { _, _ in }, credentialsConfigured: { false })
+        old.advance(); old.advance()
+        try expectEqual(old.step, .enableAPI)
+        let bundled = SetupWizardModel(stateURL: url, saveCredentials: { _, _ in },
+                                       credentialsConfigured: { true }, bundledClientAvailable: true)
+        try expectEqual(bundled.step, .welcome)
     }
 
     await test("testPageURLs") {

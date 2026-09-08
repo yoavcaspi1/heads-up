@@ -25,7 +25,7 @@ struct SetupWizardView: View {
 
     private var progressHeader: some View {
         HStack(spacing: YCDesignSystem.Spacing.xs) {
-            ForEach(SetupStep.allCases.filter { $0 != .done }, id: \.rawValue) { s in
+            ForEach(model.steps.filter { $0 != .done }, id: \.rawValue) { s in
                 Circle()
                     .fill(s.rawValue <= model.step.rawValue
                           ? YCDesignSystem.Colors.accent
@@ -33,7 +33,7 @@ struct SetupWizardView: View {
                     .frame(width: 8, height: 8)
             }
             Spacer()
-            Text("Step \(min(model.step.rawValue + 1, 6)) of 6")
+            Text("Step \(model.stepNumber) of \(model.stepCount)")
                 .font(YCDesignSystem.Typography.caption)
                 .foregroundStyle(YCDesignSystem.Colors.textSecondary)
         }
@@ -43,7 +43,11 @@ struct SetupWizardView: View {
         switch model.step {
         case .welcome:
             page(title: "Welcome to Heads Up",
-                 lines: [
+                 lines: model.bundledClientAvailable ? [
+                    "Heads Up watches your Google Calendar and puts a full-screen alert in front of you before each meeting.",
+                    "One-time setup: sign in with the Google account whose calendar you want alerts for. It takes about a minute.",
+                    "Heads Up only reads your calendar. It never changes anything, and your data stays between your Mac and Google.",
+                 ] : [
                     "Heads Up watches your Google Calendar and puts a full-screen alert in front of you before each meeting.",
                     "One-time setup: connect the app to your own Google account. It takes about 10 minutes and this guide walks you through every click.",
                     "You will create a free Google \"project\" that belongs to you, so your calendar data never goes through anyone else's account.",
@@ -91,8 +95,12 @@ struct SetupWizardView: View {
             }
         case .signIn:
             VStack(alignment: .leading, spacing: YCDesignSystem.Spacing.sm) {
-                page(title: "5. Sign in with Google",
-                     lines: [
+                page(title: "\(model.stepNumber). Sign in with Google",
+                     lines: model.bundledClientAvailable ? [
+                        "Press the button below. Your browser opens Google's sign-in page.",
+                        "Google may show a \"Google hasn't verified this app\" screen. That is normal for a small app like this one: click \"Advanced\", then \"Go to Heads Up (unsafe)\", then \"Allow\".",
+                        "You can add more Google accounts later from Settings.",
+                     ] : [
                         "Press the button below. Your browser opens Google's sign-in page.",
                         "Google will warn that the app is not verified. That is expected: it is YOUR app, created minutes ago. Click \"Advanced\", then \"Go to Heads Up (unsafe)\", then allow calendar access.",
                      ])

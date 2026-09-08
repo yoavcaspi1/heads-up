@@ -130,6 +130,29 @@ else
     echo "Warning: sparkle_public_key.txt missing; update signatures will not verify" >&2
 fi
 
+# Bundled Google OAuth client. Never in git: read from the environment or
+# from ~/.config/headsup/google-oauth-client.env, and written into
+# Info.plist so users only have to sign in. Without it the app asks for a
+# client of the user's own (the pre-1.5 flow). Release builds must have it.
+CLIENT_ENV="$HOME/.config/headsup/google-oauth-client.env"
+if [[ -z "${HEADSUP_GOOGLE_CLIENT_ID:-}" && -f "$CLIENT_ENV" ]]; then
+    set -a; source "$CLIENT_ENV"; set +a
+fi
+GOOGLE_CLIENT_XML=""
+if [[ -n "${HEADSUP_GOOGLE_CLIENT_ID:-}" && -n "${HEADSUP_GOOGLE_CLIENT_SECRET:-}" ]]; then
+    GOOGLE_CLIENT_XML="    <key>HeadsUpGoogleClientID</key>
+    <string>$HEADSUP_GOOGLE_CLIENT_ID</string>
+    <key>HeadsUpGoogleClientSecret</key>
+    <string>$HEADSUP_GOOGLE_CLIENT_SECRET</string>"
+    echo "==> Bundling Google OAuth client ${HEADSUP_GOOGLE_CLIENT_ID%%-*}-…"
+elif [[ "$HARDENED" == "true" ]]; then
+    echo "Error: no Google OAuth client to bundle. Set HEADSUP_GOOGLE_CLIENT_ID and" >&2
+    echo "HEADSUP_GOOGLE_CLIENT_SECRET, or create $CLIENT_ENV (see docs/RELEASING.md)." >&2
+    exit 1
+else
+    echo "Warning: no Google OAuth client bundled; the app will ask for the user's own" >&2
+fi
+
 echo "==> Writing Info.plist (version $SHORT_VERSION, build $BUILD_NUMBER)"
 cat > "$APP_BUNDLE/Contents/Info.plist" <<PLIST
 <?xml version="1.0" encoding="UTF-8"?>
@@ -161,6 +184,7 @@ cat > "$APP_BUNDLE/Contents/Info.plist" <<PLIST
     <key>SUFeedURL</key>
     <string>https://raw.githubusercontent.com/yoavcaspi1/heads-up/main/appcast.xml</string>
 $SPARKLE_KEY_XML
+$GOOGLE_CLIENT_XML
     <key>SUEnableAutomaticChecks</key>
     <true/>
     <key>SUScheduledCheckInterval</key>

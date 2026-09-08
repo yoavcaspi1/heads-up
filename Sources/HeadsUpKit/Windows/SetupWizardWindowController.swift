@@ -20,7 +20,8 @@ final class SetupWizardWindowController: NSObject, NSWindowDelegate {
             saveCredentials: { id, secret in
                 credentials.save(clientId: id, clientSecret: secret)
             },
-            credentialsConfigured: { credentials.isConfigured })
+            credentialsConfigured: { credentials.isConfigured },
+            bundledClientAvailable: credentials.hasBundledClient)
         self.model = model
         var closeWindow: (() -> Void)?
         self.makeContent = {
