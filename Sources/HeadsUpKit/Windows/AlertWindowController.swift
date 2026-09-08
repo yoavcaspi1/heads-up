@@ -310,6 +310,9 @@ final class AlertWindowController {
             effect.material = .fullScreenUI
             effect.blendingMode = .behindWindow
             effect.state = .active
+            // The full-screen material at full strength reads as near-solid;
+            // at half opacity the desktop behind shows through the frosting.
+            effect.alphaValue = 0.5
             effect.autoresizingMask = [.width, .height]
             container.addSubview(effect)
             effect.frame = container.bounds
