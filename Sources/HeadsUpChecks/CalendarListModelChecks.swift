@@ -35,34 +35,29 @@ func calendarListModelTests() async {
         try expectEqual(label, expectedFormatter.string(from: fixedDate))
     }
 
-    await test("testScrollTargetPrefersRequestedEvent") {
-        let today = calendarListChecksEvent("Today", dayOffset: 0)
-        let tomorrow = calendarListChecksEvent("Tomorrow", dayOffset: 1)
-        let sections = CalendarListModel.bucketed([today, tomorrow], today: calendarListChecksNow, calendar: .current)
-        let request = CalendarScrollRequest(eventKey: tomorrow.schedulerKey)
-        try expectEqual(CalendarListModel.scrollTargetId(for: request, sections: sections),
-                        CalendarListModel.rowId(forEventKey: tomorrow.schedulerKey))
+    await test("testEveryDayInWindowGetsASection") {
+        // One event a few days out; every other day, today included, must
+        // still appear with an empty body so the list reads as a fortnight.
+        let sections = CalendarListModel.bucketed([calendarListChecksEvent("Thu", dayOffset: 3)],
+                                                  today: calendarListChecksNow, calendar: .current)
+        try expectEqual(sections.map(\.dayOffset), Array(CalendarListModel.dayWindow))
+        try expectEqual(sections.first { $0.dayOffset == 3 }?.events.map(\.title), ["Thu"])
+        try expect(sections.first { $0.dayOffset == 0 }?.events.isEmpty == true)
+        try expect(sections.first { $0.dayOffset == -7 }?.events.isEmpty == true)
     }
 
-    await test("testScrollTargetFallsBackToTodayAnchor") {
-        let yesterday = calendarListChecksEvent("Yesterday", dayOffset: -1)
-        let dayAfter = calendarListChecksEvent("DayAfter", dayOffset: 2)
-        let sections = CalendarListModel.bucketed([yesterday, dayAfter], today: calendarListChecksNow, calendar: .current)
-        // No request at all, and a request for an event no longer cached:
-        // both land on the first section at or after today, never on the
-        // past.
-        try expectEqual(CalendarListModel.scrollTargetId(for: nil, sections: sections),
-                        CalendarListModel.sectionId(forDayOffset: 2))
-        let stale = CalendarScrollRequest(eventKey: "gone@0")
-        try expectEqual(CalendarListModel.scrollTargetId(for: stale, sections: sections),
-                        CalendarListModel.sectionId(forDayOffset: 2))
-        try expectNil(CalendarListModel.scrollTargetId(for: nil, sections: []))
+    await test("testScrollTargetIsTodayEvenWhenEmpty") {
+        let sections = CalendarListModel.bucketed([calendarListChecksEvent("Later", dayOffset: 2)],
+                                                  today: calendarListChecksNow, calendar: .current)
+        try expectEqual(CalendarListModel.scrollTargetId(sections: sections),
+                        CalendarListModel.sectionId(forDayOffset: 0))
+        try expectNil(CalendarListModel.scrollTargetId(sections: []))
     }
 
     await test("testScrollRequestsAreDistinct") {
-        // Same target twice must still compare unequal so onChange fires
-        // on a re-open.
-        try expect(CalendarScrollRequest(eventKey: "a@1") != CalendarScrollRequest(eventKey: "a@1"))
+        // Two opens in a row must produce unequal requests so onChange
+        // fires the second time.
+        try expect(CalendarScrollRequest() != CalendarScrollRequest())
     }
 
     await test("testBucketingExcludesBeyondOneWeek") {

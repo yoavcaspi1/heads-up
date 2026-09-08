@@ -63,18 +63,9 @@ enum TrayModel {
             .sorted { $0.start < $1.start }
     }
 
-    /// The meeting the menu bar title is about: the first of `nextEvents`
-    /// when it falls today, nil in the icon-only "no more meetings today"
-    /// state. Clicking the tray opens the calendar scrolled to this event.
-    static func focusEvent(_ events: [CalendarEvent], now: Date, calendar: Calendar) -> CalendarEvent? {
-        guard let first = nextEvents(events, now: now).first,
-              calendar.isDate(first.start, inSameDayAs: now) else { return nil }
-        return first
-    }
-
     static func state(events: [CalendarEvent], now: Date, calendar: Calendar) -> TrayState {
         let chosen = nextEvents(events, now: now)
-        guard let first = focusEvent(events, now: now, calendar: calendar) else {
+        guard let first = chosen.first, calendar.isDate(first.start, inSameDayAs: now) else {
             return TrayState(title: "",
                              tooltip: "Heads Up - no more meetings today",
                              meetingsRemainToday: false)

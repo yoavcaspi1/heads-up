@@ -6,9 +6,7 @@ import AppKit
 final class TrayController: NSObject {
     private let scheduler: Scheduler
     private let settingsStore: SettingsStore
-    /// Called with the meeting the menu bar title currently shows (nil in
-    /// the icon-only state) so the calendar can open scrolled to it.
-    private let onToggleCalendar: (CalendarEvent?) -> Void
+    private let onToggleCalendar: () -> Void
     private let onOpenSettings: () -> Void
 
     var onOpenSetupGuide: (() -> Void)?
@@ -23,13 +21,16 @@ final class TrayController: NSObject {
     private static let doneColor = YCDesignSystemNSColor.sage
 
     init(scheduler: Scheduler, settingsStore: SettingsStore,
-         onToggleCalendar: @escaping (CalendarEvent?) -> Void, onOpenSettings: @escaping () -> Void) {
+         onToggleCalendar: @escaping () -> Void, onOpenSettings: @escaping () -> Void) {
         self.scheduler = scheduler
         self.settingsStore = settingsStore
         self.onToggleCalendar = onToggleCalendar
         self.onOpenSettings = onOpenSettings
         super.init()
     }
+
+    /// Anchor for the calendar popover; nil while the menu bar item is off.
+    var statusButton: NSStatusBarButton? { statusItem?.button }
 
     func applySetting() {
         if settingsStore.settings.menuBarCalendarEnabled {
@@ -67,9 +68,7 @@ final class TrayController: NSObject {
         if event.type == .rightMouseUp || event.modifierFlags.contains(.control) {
             showMenu()
         } else {
-            // Same source as the title (trayEvents, so a skipped meeting is
-            // never the focus): whatever the bar names is what opens on top.
-            onToggleCalendar(TrayModel.focusEvent(scheduler.trayEvents, now: Date(), calendar: .current))
+            onToggleCalendar()
         }
     }
 
@@ -169,9 +168,19 @@ final class TrayController: NSObject {
     }
 }
 
-/// Tray tint values, named for back-porting into the design tokens if they
-/// ever need to exist as first-class tokens. Harbor = accent, sage = success.
+/// AppKit-side design tokens for the few places SwiftUI colours cannot
+/// reach (status item tint, popover chrome). Harbor = accent, sage =
+/// success; canvas mirrors YCDesignSystem.Colors.canvas in both themes.
 enum YCDesignSystemNSColor {
     static let harbor = NSColor(red: 0x3E / 255.0, green: 0x6E / 255.0, blue: 0x93 / 255.0, alpha: 1)
     static let sage = NSColor(red: 0x3F / 255.0, green: 0x6A / 255.0, blue: 0x4E / 255.0, alpha: 1)
+    static let canvas = dynamic(light: (0xFA, 0xF8, 0xF5), dark: (0x1B, 0x1D, 0x22))
+
+    private static func dynamic(light: (Int, Int, Int), dark: (Int, Int, Int)) -> NSColor {
+        NSColor(name: nil) { appearance in
+            let isDark = appearance.bestMatch(from: [.aqua, .darkAqua]) == .darkAqua
+            let (r, g, b) = isDark ? dark : light
+            return NSColor(srgbRed: CGFloat(r) / 255, green: CGFloat(g) / 255, blue: CGFloat(b) / 255, alpha: 1)
+        }
+    }
 }

@@ -11,7 +11,7 @@ public final class AppDelegate: NSObject, NSApplicationDelegate {
     private var scheduler: Scheduler!
     private var alerts: AlertWindowController!
     private var tray: TrayController!
-    private var mainWindow: MainWindowController!
+    private var calendarPopover: CalendarPopoverController!
     private var settingsWindow: SettingsWindowController!
     private var setupWizard: SetupWizardWindowController!
     // nil when running as a bare executable (swift run): Sparkle needs a
@@ -66,7 +66,7 @@ public final class AppDelegate: NSObject, NSApplicationDelegate {
                                   DispatchQueue.main.async { self?.alerts.show(event) }
                               })
         tray = TrayController(scheduler: scheduler, settingsStore: settingsStore,
-                              onToggleCalendar: { [weak self] event in self?.toggleMainWindow(focusing: event) },
+                              onToggleCalendar: { [weak self] in self?.toggleMainWindow() },
                               onOpenSettings: { [weak self] in self?.openSettings() })
         applyAppearance()
         tray.applySetting()
@@ -90,7 +90,7 @@ public final class AppDelegate: NSObject, NSApplicationDelegate {
     }
 
     private func finishLaunching() {
-        mainWindow = MainWindowController(
+        calendarPopover = CalendarPopoverController(
             scheduler: scheduler, registry: registry, credentials: credentials,
             onOpenSettings: { [weak self] in self?.openSettings() },
             onOpenEvent: { [weak self] event in self?.openEvent(event) })
@@ -106,7 +106,9 @@ public final class AppDelegate: NSObject, NSApplicationDelegate {
 
         setupWizard = SetupWizardWindowController(credentials: credentials, registry: registry)
         tray.onOpenSetupGuide = { [weak self] in self?.setupWizard?.show() }
-        if SetupWizardModel.shouldAutoShow(credentialsConfigured: credentials.isConfigured)
+        if SetupWizardModel.shouldAutoShow(credentialsConfigured: credentials.isConfigured,
+                                           hasAccounts: registry.hasAccounts,
+                                           finishedBefore: setupWizard.model.finished)
             || ProcessInfo.processInfo.arguments.contains("--setup-wizard") {
             setupWizard.show()
         }
@@ -202,7 +204,7 @@ public final class AppDelegate: NSObject, NSApplicationDelegate {
     /// The settings fields the on-screen alert actually renders.
     private var lastAlertAppearance: String?
     private func appearanceSignature(_ settings: AppSettings) -> String {
-        "\(settings.alertBackground.rawValue)-\(settings.alertBlurIntensity)-\(settings.alertTitleFont.rawValue)"
+        "\(settings.alertBackground.rawValue)-\(settings.alertTitleFont.rawValue)"
     }
 
     private func applyAppearance() {
@@ -240,12 +242,12 @@ public final class AppDelegate: NSObject, NSApplicationDelegate {
         NSApp.mainMenu = mainMenu
     }
 
-    /// `event` is the meeting the menu bar title shows; the calendar opens
-    /// scrolled to it, or to today when nil.
-    func toggleMainWindow(focusing event: CalendarEvent? = nil) {
+    /// Shows or hides the calendar popover under the menu-bar item, opened
+    /// with today at the top.
+    func toggleMainWindow() {
         // nil only in the short window before the background credentials
         // preload finishes launching the window controllers.
-        mainWindow?.toggle(focusing: event)
+        calendarPopover?.toggle(anchoredTo: tray.statusButton)
     }
 
     func openSettings() {

@@ -75,20 +75,6 @@ func trayModelTests() async {
         try expect(state.title.contains("(now)"))
     }
 
-    await test("testFocusEventIsTheTitledMeeting") {
-        let ongoing = trayChecksEvent("Ongoing", startMin: -10, endMin: 20)
-        let next = trayChecksEvent("Next", startMin: 15, endMin: 45)
-        let later = trayChecksEvent("Later", startMin: 60, endMin: 90)
-        try expectEqual(TrayModel.focusEvent([later, ongoing, next], now: trayChecksNow, calendar: .current)?.title, "Next")
-        try expectEqual(TrayModel.focusEvent([ongoing], now: trayChecksNow, calendar: .current)?.title, "Ongoing")
-    }
-
-    await test("testFocusEventNilInIconOnlyState") {
-        let tomorrow = trayChecksEvent("Tomorrow", startMin: 60 * 26, endMin: 60 * 27)
-        try expectNil(TrayModel.focusEvent([tomorrow], now: trayChecksNow, calendar: .current))
-        try expectNil(TrayModel.focusEvent([], now: trayChecksNow, calendar: .current))
-    }
-
     await test("testSkippableEventsTodayNotEndedOnly") {
         let ended = trayChecksEvent("Ended", startMin: -60, endMin: -10)
         let ongoing = trayChecksEvent("Ongoing", startMin: -10, endMin: 20)
