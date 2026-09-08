@@ -13,7 +13,7 @@ struct SetupWizardView: View {
 
     var body: some View {
         VStack(alignment: .leading, spacing: YCDesignSystem.Spacing.lg) {
-            progressHeader
+            if !showsAuthorNote { progressHeader }
             stepBody
             Spacer(minLength: 0)
             footer
@@ -21,6 +21,12 @@ struct SetupWizardView: View {
         .padding(YCDesignSystem.Spacing.lg)
         .frame(width: 520, height: 500)
         .background(YCDesignSystem.Colors.canvas)
+    }
+
+    /// The bundled-client welcome page is a personal note, not a step, so it
+    /// drops the dots and the "Step x of y" label.
+    private var showsAuthorNote: Bool {
+        model.step == .welcome && model.bundledClientAvailable
     }
 
     private var progressHeader: some View {
@@ -42,16 +48,16 @@ struct SetupWizardView: View {
     @ViewBuilder private var stepBody: some View {
         switch model.step {
         case .welcome:
-            page(title: "Welcome to Heads Up",
-                 lines: model.bundledClientAvailable ? [
-                    "Heads Up watches your Google Calendar and puts a full-screen alert in front of you before each meeting.",
-                    "One-time setup: sign in with the Google account whose calendar you want alerts for. It takes about a minute.",
-                    "Heads Up only reads your calendar. It never changes anything, and your data stays between your Mac and Google.",
-                 ] : [
-                    "Heads Up watches your Google Calendar and puts a full-screen alert in front of you before each meeting.",
-                    "One-time setup: connect the app to your own Google account. It takes about 10 minutes and this guide walks you through every click.",
-                    "You will create a free Google \"project\" that belongs to you, so your calendar data never goes through anyone else's account.",
-                 ])
+            if model.bundledClientAvailable {
+                authorNote
+            } else {
+                page(title: "Welcome to Heads Up",
+                     lines: [
+                        "Heads Up watches your Google Calendar and puts a full-screen alert in front of you before each meeting.",
+                        "One-time setup: connect the app to your own Google account. It takes about 10 minutes and this guide walks you through every click.",
+                        "You will create a free Google \"project\" that belongs to you, so your calendar data never goes through anyone else's account.",
+                     ])
+            }
         case .createProject:
             page(title: "1. Create a Google Cloud project",
                  lines: [
@@ -134,6 +140,59 @@ struct SetupWizardView: View {
                     "Left-click the bell for your meeting list, right-click for settings.",
                     "The app updates itself automatically when a new version is released. Nothing else to do.",
                  ])
+        }
+    }
+
+    /// One icon-and-text line of the first-launch note.
+    private struct WelcomeNote: Identifiable {
+        let symbol: String
+        let text: String
+        var id: String { symbol }
+    }
+
+    /// The three things a first-time user has to know before signing in.
+    /// Outline SF Symbols only, so the column reads as quiet marginalia
+    /// rather than three coloured badges.
+    private static let welcomeNotes: [WelcomeNote] = [
+        WelcomeNote(symbol: "desktopcomputer",
+                    text: "Heads Up needs macOS 14 (Sonoma) or newer."),
+        WelcomeNote(symbol: "person.badge.key",
+                    text: "When you sign in, Google shows a page saying it hasn't verified this app. That is expected for a small app like this one. Click Advanced, then Go to Heads Up, then Allow."),
+        WelcomeNote(symbol: "menubar.rectangle",
+                    text: "There is no Dock icon. Heads Up lives in the menu bar: look for the bell at the top right of your screen."),
+    ]
+
+    /// First-launch splash for the bundled-client flow: a short personal
+    /// note instead of a numbered welcome step. Note text is bodySmall so
+    /// the whole letter plus the footer button fits the fixed 520x500 window
+    /// without clipping.
+    private var authorNote: some View {
+        VStack(alignment: .leading, spacing: YCDesignSystem.Spacing.sm) {
+            Text("A note from Yoav")
+                .font(YCDesignSystem.Typography.h2)
+                .foregroundStyle(YCDesignSystem.Colors.textPrimary)
+            Text("Thanks for trying Heads Up. It watches your Google Calendar and puts a full-screen reminder in front of you before each meeting, so you never miss one. Three things to know before you start:")
+                .font(YCDesignSystem.Typography.body)
+                .foregroundStyle(YCDesignSystem.Colors.textSecondary)
+                .fixedSize(horizontal: false, vertical: true)
+            VStack(alignment: .leading, spacing: YCDesignSystem.Spacing.sm) {
+                ForEach(Self.welcomeNotes) { note in
+                    HStack(alignment: .top, spacing: YCDesignSystem.Spacing.sm) {
+                        Image(systemName: note.symbol)
+                            .foregroundStyle(YCDesignSystem.Colors.textMuted)
+                            .frame(width: 20, alignment: .leading)
+                        Text(note.text)
+                            .font(YCDesignSystem.Typography.bodySmall)
+                            .foregroundStyle(YCDesignSystem.Colors.textSecondary)
+                            .fixedSize(horizontal: false, vertical: true)
+                    }
+                }
+            }
+            .padding(.top, YCDesignSystem.Spacing.xs)
+            Text("Yoav")
+                .font(YCDesignSystem.Typography.body)
+                .foregroundStyle(YCDesignSystem.Colors.textSecondary)
+                .padding(.top, YCDesignSystem.Spacing.sm)
         }
     }
 
