@@ -3,7 +3,27 @@ import Foundation
 /// Non-sensitive app preferences. Mirrors the original settings-store.ts
 /// schema, plus `appearance` (native replacement for Glaze's theme select).
 struct AppSettings: Codable, Equatable {
-    enum AlertBackground: String, Codable { case solid, blur }
+    enum AlertBackground: String, Codable {
+        case solid
+        case frosted
+
+        /// Builds before the bundled backdrop called this mode "blur" and
+        /// wrote that raw value into the settings file, so a user updating
+        /// in place would otherwise silently drop back to `solid`.
+        init(from decoder: Decoder) throws {
+            let raw = try decoder.singleValueContainer().decode(String.self)
+            switch raw {
+            case "blur": self = .frosted
+            default:
+                guard let value = AlertBackground(rawValue: raw) else {
+                    throw DecodingError.dataCorrupted(.init(
+                        codingPath: decoder.codingPath,
+                        debugDescription: "unknown alert background \"\(raw)\""))
+                }
+                self = value
+            }
+        }
+    }
     enum Appearance: String, Codable { case system, light, dark }
     /// Where a clicked calendar event opens: Google Calendar in the browser
     /// (the event's own web page), Apple Calendar at the event's time, or
@@ -25,7 +45,7 @@ struct AppSettings: Codable, Equatable {
     var disabledCalendars: [String]
     /// Whether the menu bar item is shown.
     var menuBarCalendarEnabled: Bool
-    /// Alert surface: opaque canvas colour, or native blur of what is behind.
+    /// Alert surface: opaque canvas colour, or the frosted bundled backdrop.
     var alertBackground: AlertBackground
     /// System / Light / Dark override for the whole app.
     var appearance: Appearance
@@ -48,7 +68,7 @@ struct AppSettings: Codable, Equatable {
         alertsEnabled: true,
         disabledCalendars: [],
         menuBarCalendarEnabled: true,
-        alertBackground: .solid,
+        alertBackground: .frosted,
         appearance: .system,
         eventOpenTarget: .googleWeb,
         alertTitleFont: .syne,

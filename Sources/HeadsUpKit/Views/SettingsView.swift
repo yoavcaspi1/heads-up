@@ -652,10 +652,10 @@ struct SettingsView: View {
 
             SettingsSection(title: "Appearance") {
                 SettingsRow(title: "Background",
-                            subtitle: "Solid canvas, or a blur of whatever is behind the alert.") {
+                            subtitle: "Solid canvas, or the frosted Heads Up backdrop.") {
                     SettingsPicker(selection: Binding(get: { model.alertBackground }, set: model.setAlertBackground)) {
                         Text("Solid").tag(AppSettings.AlertBackground.solid)
-                        Text("Blur").tag(AppSettings.AlertBackground.blur)
+                        Text("Frosted").tag(AppSettings.AlertBackground.frosted)
                     }
                     .accessibilityLabel("Background")
                 }

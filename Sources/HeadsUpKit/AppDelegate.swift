@@ -293,7 +293,7 @@ public final class AppDelegate: NSObject, NSApplicationDelegate {
         event.isTest = true
         alerts.show(event)
         // Keep the Settings window (the only appearance controls) usable
-        // above the preview so solid/blur and tint changes preview live.
+        // above the preview so solid/frosted and font changes preview live.
         if let window = settingsWindow?.window, window.isVisible {
             window.level = NSWindow.Level(rawValue: NSWindow.Level.screenSaver.rawValue + 1)
             window.orderFront(nil)
@@ -301,7 +301,9 @@ public final class AppDelegate: NSObject, NSApplicationDelegate {
     }
 }
 
-/// The SPM resource bundle, resolved safely for BOTH runtime shapes.
+/// Lookup for anything shipped in Sources/HeadsUpKit/Resources (fonts, the
+/// alert backdrop). The SPM resource bundle is resolved safely for BOTH
+/// runtime shapes.
 /// `Bundle.module`'s generated accessor for CLI-built executables only
 /// checks the app-bundle ROOT (illegal for a signed app) and the absolute
 /// build-time path, then calls fatalError - which crashed every released
@@ -310,21 +312,31 @@ public final class AppDelegate: NSObject, NSApplicationDelegate {
 /// where build_app.sh actually puts the bundle, before ever touching
 /// Bundle.module; reach the accessor only in bare `swift run`/checks
 /// contexts, where its build-path fallback is valid.
-private let headsUpKitResources: Bundle = {
-    if let packaged = Bundle.main.resourceURL?
-        .appendingPathComponent("HeadsUp_HeadsUpKit.bundle"),
-       let bundle = Bundle(url: packaged) {
-        return bundle
+enum HeadsUpResources {
+    static let bundle: Bundle = {
+        if let packaged = Bundle.main.resourceURL?
+            .appendingPathComponent("HeadsUp_HeadsUpKit.bundle"),
+           let bundle = Bundle(url: packaged) {
+            return bundle
+        }
+        return Bundle.module
+    }()
+
+    /// Package resources are copied wholesale (`.copy("Resources")`), so a
+    /// packaged build nests them under a Resources/ directory while a bare
+    /// `swift run` can flatten them; look in both places rather than
+    /// guessing which shape we are in.
+    static func url(named name: String, withExtension ext: String?) -> URL? {
+        bundle.url(forResource: "Resources/\(name)", withExtension: ext)
+            ?? bundle.url(forResource: name, withExtension: ext)
     }
-    return Bundle.module
-}()
+}
 
 /// Registers the bundled Syne / DM Sans / DM Mono fonts with the font
 /// manager so YCDesignSystem.Typography resolves them. Safe to call when
 /// fonts are missing: the design system falls back to the system font.
 public func registerBundledFonts() {
-    guard let fontsURL = headsUpKitResources.url(forResource: "Resources/Fonts", withExtension: nil)
-        ?? headsUpKitResources.url(forResource: "Fonts", withExtension: nil) else { return }
+    guard let fontsURL = HeadsUpResources.url(named: "Fonts", withExtension: nil) else { return }
     let urls = (try? FileManager.default.contentsOfDirectory(
         at: fontsURL, includingPropertiesForKeys: nil)) ?? []
     for url in urls where url.pathExtension.lowercased() == "ttf" {

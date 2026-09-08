@@ -34,13 +34,14 @@ struct AlertView: View {
                 Spacer()
                 hero(now: now)
                 Spacer()
-                snoozeRow(now: now)
-                    .padding(.bottom, YCDesignSystem.Spacing.xxl)
             }
             .frame(maxWidth: .infinity, maxHeight: .infinity)
         }
     }
 
+    /// The whole alert body. Named hero from when the snooze row sat apart
+    /// at the foot of the screen; the snooze row now travels with the
+    /// buttons it belongs to, so the group centres as one block.
     private func hero(now: Date) -> some View {
         VStack(spacing: YCDesignSystem.Spacing.lg) {
             // The full title must ALWAYS be visible: no line limit, and
@@ -79,7 +80,7 @@ struct AlertView: View {
                 // locations here.
                 if let location = event.location, location != event.meetingUrl {
                     Text(location)
-                        .font(YCDesignSystem.Typography.body)
+                        .font(YCDesignSystem.Typography.bodyLarge)
                         .foregroundStyle(YCDesignSystem.Colors.textMuted)
                         .lineLimit(1)
                         .truncationMode(.middle)
@@ -107,6 +108,8 @@ struct AlertView: View {
                 actionButton("Dismiss", icon: nil, primary: event.meetingUrl == nil, action: onDismiss)
             }
             .padding(.top, YCDesignSystem.Spacing.sm)
+
+            snoozeRow(now: now)
         }
     }
 

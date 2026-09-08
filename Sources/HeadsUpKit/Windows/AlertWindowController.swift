@@ -36,9 +36,9 @@ final class AlertWindowController {
     private var becameActiveObserver: Any?
     /// The AlertBackground mode `windows` were built with. `isOpaque` is set
     /// once at panel creation and never re-evaluated on a content swap, so
-    /// this lets `show()` detect a mode change (solid <-> blur) while an
+    /// this lets `show()` detect a mode change (solid <-> frosted) while an
     /// alert is already up and rebuild the panels instead of leaving them
-    /// stale (opaque under blur, or vice versa).
+    /// stale (opaque under frosted, or vice versa).
     private var windowsAlertBackground: AppSettings.AlertBackground?
     /// Live-geometry observers, alive only while an alert is on screen.
     private var screenParametersObserver: Any?
@@ -66,7 +66,7 @@ final class AlertWindowController {
     var isOpen: Bool { !windows.isEmpty }
 
     /// Re-applies the current appearance settings to an alert that is already
-    /// on screen, so Settings changes (blur tint intensity, solid vs blur)
+    /// on screen, so Settings changes (solid vs frosted, title font)
     /// take effect live instead of only on the next alert. show() itself
     /// decides between a content swap and a full panel rebuild.
     func refreshAppearance() {
@@ -98,7 +98,7 @@ final class AlertWindowController {
         //
         // Otherwise rebuild. Two things force that: a background mode change
         // (isOpaque is fixed at panel creation, so a content-only swap would
-        // leave a blur-mode alert opaque, or a solid-mode alert transparent),
+        // leave a frosted alert opaque, or a solid-mode alert transparent),
         // and a display count change (panels are one-per-screen, so the
         // mapping itself is stale and cannot be fixed by resizing).
         if isOpen, windowsAlertBackground == settings.alertBackground, applyScreenFrames() {
@@ -284,6 +284,11 @@ final class AlertWindowController {
         for w in toClose { w.close() }
     }
 
+    /// Canvas wash over the blurred backdrop: enough for the dynamic text
+    /// colours to read in either appearance, light enough that the picture
+    /// still shows through.
+    private static let frostedWashOpacity = 0.45
+
     private func makeContentView(_ event: CalendarEvent) -> NSView {
         let settings = settingsStore.settings
         let root = AlertView(
@@ -305,19 +310,34 @@ final class AlertWindowController {
             })
 
         let container = NSView()
-        if settings.alertBackground == .blur {
-            let effect = NSVisualEffectView()
-            // underWindowBackground is the translucent, heavily blurred
-            // system material (the one behind app windows), light or dark
-            // with the app appearance. fullScreenUI was near-solid, and
-            // fading the effect view with alphaValue thins the blur itself
-            // into a colour wash, so the view stays at full strength.
-            effect.material = .underWindowBackground
-            effect.blendingMode = .behindWindow
-            effect.state = .active
-            effect.autoresizingMask = [.width, .height]
-            container.addSubview(effect)
-            effect.frame = container.bounds
+        if settings.alertBackground == .frosted {
+            if let backdrop = AlertBackdrop.image() {
+                let picture = NSImageView()
+                picture.image = backdrop
+                // Fill the screen exactly; a blurred picture hides any
+                // aspect mismatch.
+                picture.imageScaling = .scaleAxesIndependently
+                picture.autoresizingMask = [.width, .height]
+                container.addSubview(picture)
+                picture.frame = container.bounds
+            } else {
+                // Bundled picture unreadable (a mangled app bundle): fall
+                // back to the most translucent system material. Never fade
+                // it with alphaValue; that thins the blur into a colour wash.
+                let effect = NSVisualEffectView()
+                effect.material = .hudWindow
+                effect.blendingMode = .behindWindow
+                effect.state = .active
+                effect.autoresizingMask = [.width, .height]
+                container.addSubview(effect)
+                effect.frame = container.bounds
+            }
+            let wash = NSHostingView(rootView: YCDesignSystem.Colors.canvas
+                .opacity(Self.frostedWashOpacity)
+                .ignoresSafeArea())
+            wash.autoresizingMask = [.width, .height]
+            container.addSubview(wash)
+            wash.frame = container.bounds
         } else {
             let solid = NSHostingView(rootView: YCDesignSystem.Colors.canvas.ignoresSafeArea())
             solid.autoresizingMask = [.width, .height]

@@ -11,7 +11,7 @@ func appSettingsTests() async {
         try expect(s.alertsEnabled)
         try expectEqual(s.disabledCalendars, [])
         try expect(s.menuBarCalendarEnabled)
-        try expectEqual(s.alertBackground, .solid)
+        try expectEqual(s.alertBackground, .frosted)
         try expectEqual(s.appearance, .system)
         try expectEqual(s.eventOpenTarget, .googleWeb)
         try expectEqual(s.skippedEvents, [])
@@ -43,7 +43,19 @@ func appSettingsTests() async {
         // slider carry the old key; it must be ignored, not fail decoding.
         let legacy = #"{"alertBackground":"blur","alertBlurIntensity":30}"#
         let decoded = try JSONDecoder().decode(AppSettings.self, from: Data(legacy.utf8))
-        try expectEqual(decoded.alertBackground, .blur)
+        try expectEqual(decoded.alertBackground, .frosted)
+    }
+
+    await test("testDecodeMapsLegacyBlurBackgroundToFrosted") {
+        // The mode was renamed once the backdrop stopped being the user's
+        // own wallpaper; settings files written before that carry "blur",
+        // and a user updating in place must keep the mode they chose.
+        func background(_ json: String) throws -> AppSettings.AlertBackground {
+            try JSONDecoder().decode(AppSettings.self, from: Data(json.utf8)).alertBackground
+        }
+        try expectEqual(try background(#"{"alertBackground":"blur"}"#), .frosted)
+        try expectEqual(try background(#"{"alertBackground":"solid"}"#), .solid)
+        try expectEqual(try background("{}"), .frosted)
     }
 
     await test("testStoreRoundTripAndPatch") {
