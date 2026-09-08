@@ -3,12 +3,12 @@
   <channel>
     <title>Heads Up</title>
     <item>
-      <title>Heads Up 1.7.0</title>
-      <pubDate>Tue, 08 Sep 2026 13:51:49 +0100</pubDate>
-      <sparkle:shortVersionString>1.7.0</sparkle:shortVersionString>
-      <sparkle:version>53</sparkle:version>
+      <title>Heads Up 1.7.1</title>
+      <pubDate>Tue, 08 Sep 2026 13:59:17 +0100</pubDate>
+      <sparkle:shortVersionString>1.7.1</sparkle:shortVersionString>
+      <sparkle:version>56</sparkle:version>
       <sparkle:minimumSystemVersion>14.0</sparkle:minimumSystemVersion>
-      <enclosure url="https://github.com/yoavcaspi1/heads-up/releases/download/v1.7.0/HeadsUp-1.7.0.zip" sparkle:edSignature="Mwzu02ewgd04IJV0ARhfuJLjwwLTe5AGYEWDSkIOBF4z/5KEtQlX95thhuCAt/CpE4/skdOvPfTO4OgIWT6QCA==" length="5337239" type="application/octet-stream"/>
+      <enclosure url="https://github.com/yoavcaspi1/heads-up/releases/download/v1.7.1/HeadsUp-1.7.1.zip" sparkle:edSignature="LOK7mKa831PEWSNqhwR828KBskQu5RJXT4rS/mqvuFk041V/vhdC2D/m+kShi8MdQa0C/+Q8bfvNQ0JxRgL4Bw==" length="5353569" type="application/octet-stream"/>
     </item>
   </channel>
 </rss>
