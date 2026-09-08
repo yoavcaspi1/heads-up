@@ -307,12 +307,14 @@ final class AlertWindowController {
         let container = NSView()
         if settings.alertBackground == .blur {
             let effect = NSVisualEffectView()
-            effect.material = .fullScreenUI
+            // underWindowBackground is the translucent, heavily blurred
+            // system material (the one behind app windows), light or dark
+            // with the app appearance. fullScreenUI was near-solid, and
+            // fading the effect view with alphaValue thins the blur itself
+            // into a colour wash, so the view stays at full strength.
+            effect.material = .underWindowBackground
             effect.blendingMode = .behindWindow
             effect.state = .active
-            // The full-screen material at full strength reads as near-solid;
-            // at half opacity the desktop behind shows through the frosting.
-            effect.alphaValue = 0.5
             effect.autoresizingMask = [.width, .height]
             container.addSubview(effect)
             effect.frame = container.bounds
