@@ -35,8 +35,9 @@ final class SettingsWindowController: NSObject, NSWindowDelegate {
 
     func show() {
         if window == nil {
-            let w = NSWindow(contentRect: NSRect(x: 0, y: 0, width: 480, height: 640),
-                             styleMask: [.titled, .closable, .miniaturizable],
+            let size = SettingsView.preferredSize
+            let w = NSWindow(contentRect: NSRect(x: 0, y: 0, width: size.width, height: size.height),
+                             styleMask: [.titled, .closable, .miniaturizable, .resizable],
                              backing: .buffered, defer: false)
             w.title = "Heads Up Settings"
             w.isReleasedWhenClosed = false

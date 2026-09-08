@@ -346,137 +346,206 @@ final class SettingsModel: ObservableObject {
     }
 }
 
+/// Sidebar tabs. Declaration order is the sidebar order.
+enum SettingsTab: String, CaseIterable, Identifiable {
+    case general = "General"
+    case google = "Google"
+    case alerts = "Alerts"
+    case about = "About"
+
+    var id: String { rawValue }
+
+    /// Outline symbol variants: the YC icon language is stroke, so sidebar
+    /// glyphs render as ink outlines, not filled colour tiles.
+    var icon: String {
+        switch self {
+        case .general: return "gearshape"
+        case .google: return "person.crop.circle"
+        case .alerts: return "bell"
+        case .about: return "info.circle"
+        }
+    }
+}
+
+/// Settings in the Call Recorder preferences layout: a flat canvas sidebar
+/// of tabs on the left, a scrolling detail pane of eyebrow-headed cards on
+/// the right. Every control and its binding is unchanged from the single
+/// column this replaced; only the arrangement moved.
 struct SettingsView: View {
     @ObservedObject var model: SettingsModel
 
+    @State private var selectedTab: SettingsTab = .general
     /// Reveals the paste-your-own-client fields on top of the bundled
     /// client; off until the user asks for them.
     @State private var showCustomClientFields = false
 
+    static let preferredSize = NSSize(width: 760, height: 600)
+
     private let setupSteps = "Create a Google Cloud project (or reuse an existing one), enable the Calendar API, then create an OAuth client of type Desktop app. Paste its client ID and secret below."
 
     var body: some View {
-        ScrollView {
-            VStack(alignment: .leading, spacing: YCDesignSystem.Spacing.lg) {
-                notificationsSection
-                googleConnectionSection
-                if model.configured {
-                    accountsSection
-                }
-                if model.configured && !model.accounts.isEmpty {
-                    calendarsSection
-                }
-                alertsSection
-                snoozeSection
-                appearanceSection
-                testSection
-                updatesSection
-            }
-            .padding(YCDesignSystem.Spacing.md)
+        HStack(spacing: 0) {
+            sidebar
+
+            Rectangle()
+                .fill(YCDesignSystem.Colors.border)
+                .frame(width: 1)
+
+            detail
+                .frame(maxWidth: .infinity, maxHeight: .infinity)
         }
+        // A flexible frame, not a fixed one: a rigid root view pins the
+        // window size through the hosting view and the resizable style
+        // mask stops meaning anything.
+        .frame(minWidth: 680, idealWidth: Self.preferredSize.width, maxWidth: .infinity,
+               minHeight: 520, idealHeight: Self.preferredSize.height, maxHeight: .infinity)
         .background(YCDesignSystem.Colors.canvas)
-        .frame(width: 480, height: 640)
     }
 
-    // MARK: - 1. Notifications
+    // MARK: - Sidebar
 
-    private var notificationsSection: some View {
-        sectionCard("Notifications") {
-            VStack(spacing: YCDesignSystem.Spacing.sm) {
-                settingsRow("Full-screen alerts") {
-                    Toggle("", isOn: Binding(get: { model.alertsEnabled }, set: model.setAlertsEnabled))
-                        .toggleStyle(.switch)
-                        .tint(YCDesignSystem.Colors.accent)
-                        .labelsHidden()
+    private var sidebar: some View {
+        VStack(spacing: 2) {
+            ForEach(SettingsTab.allCases) { tab in
+                SettingsSidebarRow(title: tab.rawValue, icon: tab.icon, isSelected: selectedTab == tab)
+                    .onTapGesture { selectedTab = tab }
+            }
+            Spacer()
+        }
+        .padding(.vertical, 12)
+        .padding(.horizontal, 8)
+        .frame(width: 204)
+        .background(YCDesignSystem.Colors.canvas)
+    }
+
+    @ViewBuilder private var detail: some View {
+        switch selectedTab {
+        case .general: generalTab
+        case .google: googleTab
+        case .alerts: alertsTab
+        case .about: aboutTab
+        }
+    }
+
+    // MARK: - General
+
+    private var generalTab: some View {
+        SettingsDetailPane {
+            SettingsSection(title: "Notifications") {
+                SettingsRow(title: "Full-screen alerts",
+                            subtitle: "Put a full-screen alert in front of you before each meeting.") {
+                    SettingsToggle(isOn: Binding(get: { model.alertsEnabled }, set: model.setAlertsEnabled))
                         .accessibilityLabel("Full-screen alerts")
                 }
-                settingsRow("Menu bar calendar") {
-                    Toggle("", isOn: Binding(get: { model.menuBarCalendarEnabled }, set: model.setMenuBarCalendarEnabled))
-                        .toggleStyle(.switch)
-                        .tint(YCDesignSystem.Colors.accent)
-                        .labelsHidden()
+                SettingsRow(title: "Menu bar calendar",
+                            subtitle: "Show the next meeting and its countdown in the menu bar; click it for the day list.",
+                            showDivider: false) {
+                    SettingsToggle(isOn: Binding(get: { model.menuBarCalendarEnabled }, set: model.setMenuBarCalendarEnabled))
                         .accessibilityLabel("Menu bar calendar")
                 }
-                settingsRow("Open events in") {
-                    Picker("", selection: Binding(get: { model.eventOpenTarget }, set: model.setEventOpenTarget)) {
+            }
+
+            SettingsSection(title: "Events") {
+                SettingsRow(title: "Open events in",
+                            subtitle: "Where a clicked event in the calendar list opens.",
+                            showDivider: false) {
+                    SettingsPicker(selection: Binding(get: { model.eventOpenTarget }, set: model.setEventOpenTarget)) {
                         Text("Google Calendar (browser)").tag(AppSettings.EventOpenTarget.googleWeb)
                         Text("Apple Calendar").tag(AppSettings.EventOpenTarget.appleCalendar)
                         Text("Notion Calendar").tag(AppSettings.EventOpenTarget.notionCalendar)
                     }
-                    .pickerStyle(.menu)
-                    .labelsHidden()
                     .accessibilityLabel("Open events in")
-                    .frame(width: 200)
+                }
+            }
+
+            SettingsSection(title: "Appearance") {
+                SettingsRow(title: "App appearance",
+                            subtitle: "Light or dark for the alert, the calendar and this window.",
+                            showDivider: false) {
+                    SettingsPicker(selection: Binding(get: { model.appearance }, set: model.setAppearance)) {
+                        Text("System").tag(AppSettings.Appearance.system)
+                        Text("Light").tag(AppSettings.Appearance.light)
+                        Text("Dark").tag(AppSettings.Appearance.dark)
+                    }
+                    .accessibilityLabel("App appearance")
                 }
             }
         }
     }
 
-    // MARK: - 2. Google connection
+    // MARK: - Google
 
-    private var googleConnectionSection: some View {
-        sectionCard("Google connection") {
-            VStack(alignment: .leading, spacing: YCDesignSystem.Spacing.smd) {
-                if model.credentialsInvalid {
-                    callout(
-                        "Google rejected these credentials. Re-enter your client ID and secret.",
-                        background: YCDesignSystem.Colors.dangerBg,
-                        foreground: YCDesignSystem.Colors.dangerText)
-                }
-                if model.configured && !model.usesBundledClient {
-                    HStack {
-                        Text(truncatedMiddle(model.savedClientId ?? ""))
-                            .font(YCDesignSystem.Typography.code)
-                            .foregroundStyle(YCDesignSystem.Colors.textSecondary)
-                            .lineLimit(1)
-                            .truncationMode(.middle)
-                        Spacer()
-                        destructiveOutlineButton("Remove") {
-                            model.clearCredentials()
-                            showCustomClientFields = false
+    private var googleTab: some View {
+        SettingsDetailPane {
+            SettingsSection(title: "Google connection") {
+                VStack(alignment: .leading, spacing: 0) {
+                    if model.credentialsInvalid {
+                        SettingsCallout(severity: .danger,
+                                        message: "Google rejected these credentials. Re-enter your client ID and secret.")
+                            .padding(14)
+                    }
+                    if model.configured && !model.usesBundledClient {
+                        SettingsRow(title: "Your own Google client",
+                                    subtitle: truncatedMiddle(model.savedClientId ?? ""),
+                                    showDivider: false) {
+                            SettingsButton(title: "Remove", isDestructive: true) {
+                                model.clearCredentials()
+                                showCustomClientFields = false
+                            }
                         }
-                    }
-                } else if model.usesBundledClient && !showCustomClientFields {
-                    HStack(alignment: .top, spacing: YCDesignSystem.Spacing.sm) {
-                        Text("Using the Google connection built into Heads Up. Just add your account below.")
-                            .font(YCDesignSystem.Typography.bodySmall)
-                            .foregroundStyle(YCDesignSystem.Colors.textSecondary)
-                            .fixedSize(horizontal: false, vertical: true)
-                        Spacer()
-                        Button("Use my own client…") { showCustomClientFields = true }
-                            .buttonStyle(.plain)
-                            .font(YCDesignSystem.Typography.label)
-                            .foregroundStyle(YCDesignSystem.Colors.link)
-                    }
-                } else {
-                    callout(setupSteps,
-                            background: YCDesignSystem.Colors.warningBg,
-                            foreground: YCDesignSystem.Colors.warningText)
-                    VStack(alignment: .leading, spacing: YCDesignSystem.Spacing.xs) {
-                        Text("Client ID")
-                            .font(YCDesignSystem.Typography.label)
-                            .foregroundStyle(YCDesignSystem.Colors.textSecondary)
-                        TextField("Client ID", text: $model.clientIdInput)
-                            .textFieldStyle(.roundedBorder)
-                            .accessibilityLabel("Client ID")
-                    }
-                    VStack(alignment: .leading, spacing: YCDesignSystem.Spacing.xs) {
-                        Text("Client secret")
-                            .font(YCDesignSystem.Typography.label)
-                            .foregroundStyle(YCDesignSystem.Colors.textSecondary)
-                        SecureField("Client secret", text: $model.clientSecretInput)
-                            .textFieldStyle(.roundedBorder)
-                            .accessibilityLabel("Client secret")
-                    }
-                    HStack {
-                        Spacer()
-                        primaryButton("Save credentials", disabled: !canSaveCredentials) {
-                            model.saveCredentials()
+                    } else if model.usesBundledClient && !showCustomClientFields {
+                        SettingsRow(title: "Built-in Google connection",
+                                    subtitle: "Sign-in goes through the client that ships with Heads Up. Just add your account below.",
+                                    showDivider: false) {
+                            SettingsButton(title: "Use my own client…") { showCustomClientFields = true }
                         }
+                    } else {
+                        customClientForm
                     }
                 }
             }
+
+            if model.configured {
+                accountsSection
+            }
+
+            if model.configured && !model.accounts.isEmpty {
+                calendarsSection
+            }
         }
+    }
+
+    private var customClientForm: some View {
+        VStack(alignment: .leading, spacing: YCDesignSystem.Spacing.smd) {
+            SettingsCallout(severity: .info, message: setupSteps)
+            VStack(alignment: .leading, spacing: YCDesignSystem.Spacing.xs) {
+                Text("Client ID")
+                    .font(YCDesignSystem.Typography.label)
+                    .foregroundStyle(YCDesignSystem.Colors.textSecondary)
+                TextField("Client ID", text: $model.clientIdInput)
+                    .textFieldStyle(.roundedBorder)
+                    .accessibilityLabel("Client ID")
+            }
+            VStack(alignment: .leading, spacing: YCDesignSystem.Spacing.xs) {
+                Text("Client secret")
+                    .font(YCDesignSystem.Typography.label)
+                    .foregroundStyle(YCDesignSystem.Colors.textSecondary)
+                SecureField("Client secret", text: $model.clientSecretInput)
+                    .textFieldStyle(.roundedBorder)
+                    .accessibilityLabel("Client secret")
+            }
+            HStack(spacing: YCDesignSystem.Spacing.sm) {
+                Spacer()
+                if model.usesBundledClient {
+                    Button("Cancel") { showCustomClientFields = false }
+                        .buttonStyle(YCSecondaryButtonStyle())
+                }
+                Button("Save credentials") { model.saveCredentials() }
+                    .buttonStyle(YCPrimaryButtonStyle())
+                    .disabled(!canSaveCredentials)
+            }
+        }
+        .padding(14)
     }
 
     private var canSaveCredentials: Bool {
@@ -484,329 +553,203 @@ struct SettingsView: View {
             && !model.clientSecretInput.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
     }
 
-    // MARK: - 3. Accounts
-
     private var accountsSection: some View {
-        sectionCard("Accounts") {
-            VStack(alignment: .leading, spacing: YCDesignSystem.Spacing.smd) {
+        SettingsSection(title: "Accounts") {
+            VStack(alignment: .leading, spacing: 0) {
                 if let error = model.accountsError {
-                    callout(error, background: YCDesignSystem.Colors.dangerBg, foreground: YCDesignSystem.Colors.dangerText)
+                    SettingsCallout(severity: .danger, message: error)
+                        .padding(14)
                 }
                 if model.accounts.isEmpty {
                     Text("No Google accounts connected yet.")
                         .font(YCDesignSystem.Typography.bodySmall)
                         .foregroundStyle(YCDesignSystem.Colors.textMuted)
+                        .padding(14)
                 } else {
-                    VStack(alignment: .leading, spacing: YCDesignSystem.Spacing.smd) {
-                        ForEach(model.accounts) { account in
-                            accountRow(account)
-                            if account.id != model.accounts.last?.id {
-                                Rectangle()
-                                    .fill(YCDesignSystem.Colors.border)
-                                    .frame(height: 1)
-                            }
-                        }
+                    ForEach(model.accounts) { account in
+                        accountRow(account)
                     }
                 }
                 HStack {
                     Spacer()
-                    primaryButton(model.isAddingAccount ? "Adding..." : "Add Google account",
-                                  disabled: model.isAddingAccount) {
+                    Button(model.isAddingAccount ? "Adding..." : "Add Google account") {
                         Task { await model.addAccount() }
                     }
+                    .buttonStyle(YCPrimaryButtonStyle())
+                    .disabled(model.isAddingAccount)
                 }
+                .padding(14)
             }
         }
     }
 
     private func accountRow(_ account: GoogleAccount) -> some View {
-        HStack(alignment: .top, spacing: YCDesignSystem.Spacing.sm) {
-            VStack(alignment: .leading, spacing: YCDesignSystem.Spacing.xs) {
-                Text(account.email)
-                    .font(YCDesignSystem.Typography.body)
-                    .foregroundStyle(YCDesignSystem.Colors.textPrimary)
-                Text(account.name)
-                    .font(YCDesignSystem.Typography.caption)
-                    .foregroundStyle(YCDesignSystem.Colors.textMuted)
-                if account.needsReconnect {
-                    Text("Sign-in expired")
-                        .font(YCDesignSystem.Typography.caption)
-                        .foregroundStyle(YCDesignSystem.Colors.dangerText)
-                }
-            }
-            Spacer()
+        SettingsRow(title: account.email, subtitle: account.name) {
             HStack(spacing: YCDesignSystem.Spacing.sm) {
                 if account.needsReconnect {
+                    StatusPill(text: "Sign-in expired", color: YCDesignSystem.Colors.dangerText,
+                               icon: "exclamationmark.triangle.fill")
                     let isBusy = model.reconnectingAccountId == account.id
-                    primaryButton(isBusy ? "Reconnecting..." : "Reconnect", disabled: isBusy) {
+                    Button(isBusy ? "Reconnecting..." : "Reconnect") {
                         Task { await model.reconnectAccount(id: account.id) }
                     }
+                    .buttonStyle(YCPrimaryButtonStyle())
+                    .disabled(isBusy)
                 }
-                quietButton("Remove") { model.removeAccount(id: account.id) }
+                SettingsButton(title: "Remove", isDestructive: true) { model.removeAccount(id: account.id) }
             }
         }
     }
 
-    // MARK: - 4. Calendars
-
     private var calendarsSection: some View {
-        sectionCard("Calendars") {
-            VStack(alignment: .leading, spacing: YCDesignSystem.Spacing.smd) {
-                if model.calendars.isEmpty {
-                    Text("No calendars found yet.")
-                        .font(YCDesignSystem.Typography.bodySmall)
-                        .foregroundStyle(YCDesignSystem.Colors.textMuted)
-                } else {
-                    ForEach(model.calendars, id: \.key) { info in
-                        calendarRow(info)
+        SettingsSection(title: "Calendars") {
+            if model.calendars.isEmpty {
+                Text("No calendars found yet.")
+                    .font(YCDesignSystem.Typography.bodySmall)
+                    .foregroundStyle(YCDesignSystem.Colors.textMuted)
+                    .padding(14)
+                    .frame(maxWidth: .infinity, alignment: .leading)
+            } else {
+                ForEach(model.calendars, id: \.key) { info in
+                    SettingsRow(title: info.calendarName,
+                                subtitle: model.accounts.count > 1 ? info.accountEmail : nil,
+                                showDivider: info.key != model.calendars.last?.key) {
+                        SettingsToggle(isOn: Binding(
+                            get: { model.isCalendarEnabled(info) },
+                            set: { model.setCalendarEnabled(key: info.key, enabled: $0) }))
+                            .accessibilityLabel(info.calendarName)
                     }
                 }
             }
         }
     }
 
-    private func calendarRow(_ info: CalendarInfo) -> some View {
-        HStack {
-            VStack(alignment: .leading, spacing: YCDesignSystem.Spacing.xs) {
-                Text(info.calendarName)
-                    .font(YCDesignSystem.Typography.body)
-                    .foregroundStyle(YCDesignSystem.Colors.textPrimary)
-                if model.accounts.count > 1 {
-                    Text(info.accountEmail)
-                        .font(YCDesignSystem.Typography.caption)
-                        .foregroundStyle(YCDesignSystem.Colors.textMuted)
+    // MARK: - Alerts
+
+    private var alertsTab: some View {
+        SettingsDetailPane {
+            SettingsSection(title: "Timing") {
+                SettingsRow(title: "First alert",
+                            subtitle: "How long before the meeting the first full-screen alert fires.") {
+                    leadTimePicker(index: 0)
+                }
+                SettingsRow(title: "Second alert",
+                            subtitle: "A second alert, closer to the start.",
+                            showDivider: false) {
+                    leadTimePicker(index: 1)
                 }
             }
-            Spacer()
-            Toggle("", isOn: Binding(
-                get: { model.isCalendarEnabled(info) },
-                set: { model.setCalendarEnabled(key: info.key, enabled: $0) }))
-                .toggleStyle(.switch)
-                .tint(YCDesignSystem.Colors.accent)
-                .labelsHidden()
-                .accessibilityLabel(info.calendarName)
-        }
-    }
 
-    // MARK: - 5. Alerts
+            SettingsSection(title: "Snooze") {
+                SettingsRow(title: "First snooze button",
+                            subtitle: "The quick snooze offered on the alert.") {
+                    snoozePicker(index: 0)
+                }
+                SettingsRow(title: "Second snooze button", showDivider: false) {
+                    snoozePicker(index: 1)
+                }
+            }
 
-    private var alertsSection: some View {
-        sectionCard("Alerts") {
-            VStack(spacing: YCDesignSystem.Spacing.sm) {
-                settingsRow("First alert") { leadTimePicker(index: 0) }
-                settingsRow("Second alert") { leadTimePicker(index: 1) }
+            SettingsSection(title: "Appearance") {
+                SettingsRow(title: "Background",
+                            subtitle: "Solid canvas, or a blur of whatever is behind the alert.") {
+                    SettingsPicker(selection: Binding(get: { model.alertBackground }, set: model.setAlertBackground)) {
+                        Text("Solid").tag(AppSettings.AlertBackground.solid)
+                        Text("Blur").tag(AppSettings.AlertBackground.blur)
+                    }
+                    .accessibilityLabel("Background")
+                }
+                SettingsRow(title: "Title font",
+                            subtitle: "Typeface for the meeting title on the alert.",
+                            showDivider: false) {
+                    SettingsPicker(selection: Binding(get: { model.alertTitleFont }, set: model.setAlertTitleFont)) {
+                        Text("Syne").tag(AppSettings.AlertTitleFont.syne)
+                        Text("DM Sans").tag(AppSettings.AlertTitleFont.dmSans)
+                    }
+                    .accessibilityLabel("Title font")
+                }
+            }
+
+            SettingsSection(title: "Test") {
+                SettingsRow(title: "Preview the alert",
+                            subtitle: "Shows a full-screen test alert with the current settings.",
+                            showDivider: false) {
+                    SettingsButton(title: "Show test alert") { model.testAlert() }
+                }
             }
         }
     }
 
     private func leadTimePicker(index: Int) -> some View {
-        Picker("", selection: Binding(
+        SettingsPicker(selection: Binding(
             get: { model.alertLeadTimes.indices.contains(index) ? model.alertLeadTimes[index] : AppSettings.defaults.alertLeadTimes[index] },
             set: { model.setLeadTime(index: index, minutes: $0) })) {
             ForEach(AppSettings.allowedLeadTimes, id: \.self) { minutes in
                 Text(leadTimeLabel(minutes)).tag(minutes)
             }
         }
-        .pickerStyle(.menu)
-        .labelsHidden()
         .accessibilityLabel(index == 0 ? "First alert" : "Second alert")
-        .frame(width: 200)
-    }
-
-    // MARK: - 6. Snooze
-
-    private var snoozeSection: some View {
-        sectionCard("Snooze") {
-            VStack(spacing: YCDesignSystem.Spacing.sm) {
-                settingsRow("First snooze button") { snoozePicker(index: 0) }
-                settingsRow("Second snooze button") { snoozePicker(index: 1) }
-            }
-        }
     }
 
     private func snoozePicker(index: Int) -> some View {
-        Picker("", selection: Binding(
+        SettingsPicker(selection: Binding(
             get: { model.snoozeDurations.indices.contains(index) ? model.snoozeDurations[index] : AppSettings.defaults.snoozeDurations[index] },
             set: { model.setSnoozeDuration(index: index, minutes: $0) })) {
             ForEach(AppSettings.allowedSnoozeMinutes, id: \.self) { minutes in
                 Text(humanizeDuration(minutes)).tag(minutes)
             }
         }
-        .pickerStyle(.menu)
-        .labelsHidden()
         .accessibilityLabel(index == 0 ? "First snooze button" : "Second snooze button")
-        .frame(width: 200)
     }
 
-    // MARK: - 7. Alert appearance
+    // MARK: - About
 
-    private var appearanceSection: some View {
-        sectionCard("Alert appearance") {
-            VStack(spacing: YCDesignSystem.Spacing.sm) {
-                settingsRow("Background") {
-                    Picker("", selection: Binding(get: { model.alertBackground }, set: model.setAlertBackground)) {
-                        Text("Solid").tag(AppSettings.AlertBackground.solid)
-                        Text("Blur").tag(AppSettings.AlertBackground.blur)
+    private var aboutTab: some View {
+        SettingsDetailPane {
+            SettingsSection(title: "Application") {
+                HStack(spacing: 16) {
+                    if let icon = NSApp.applicationIconImage {
+                        Image(nsImage: icon)
+                            .resizable()
+                            .frame(width: 64, height: 64)
                     }
-                    .pickerStyle(.menu)
-                    .labelsHidden()
-                    .accessibilityLabel("Background")
-                    .frame(width: 140)
-                }
-                settingsRow("Title font") {
-                    Picker("", selection: Binding(get: { model.alertTitleFont }, set: model.setAlertTitleFont)) {
-                        Text("Syne").tag(AppSettings.AlertTitleFont.syne)
-                        Text("DM Sans").tag(AppSettings.AlertTitleFont.dmSans)
+                    VStack(alignment: .leading, spacing: 6) {
+                        Text("Heads Up")
+                            .font(YCDesignSystem.Typography.h2)
+                            .foregroundStyle(YCDesignSystem.Colors.textPrimary)
+                        Text(model.versionLabel.replacingOccurrences(of: "Heads Up ", with: "Version "))
+                            .font(.system(size: 12))
+                            .foregroundStyle(YCDesignSystem.Colors.textSecondary)
+                        Button("Check for Updates…") { model.checkForUpdates() }
+                            .buttonStyle(YCSecondaryButtonStyle())
+                            .disabled(!model.canCheckForUpdates)
+                        Text("Developer: Yoav Caspi")
+                            .font(.system(size: 12))
+                            .foregroundStyle(YCDesignSystem.Colors.textSecondary)
+                        Text("com.yoavcaspi.headsup")
+                            .font(YCDesignSystem.Typography.code)
+                            .foregroundStyle(YCDesignSystem.Colors.textMuted)
                     }
-                    .pickerStyle(.menu)
-                    .labelsHidden()
-                    .accessibilityLabel("Title font")
-                    .frame(width: 140)
+                    Spacer()
                 }
-                settingsRow("App appearance") {
-                    Picker("", selection: Binding(get: { model.appearance }, set: model.setAppearance)) {
-                        Text("System").tag(AppSettings.Appearance.system)
-                        Text("Light").tag(AppSettings.Appearance.light)
-                        Text("Dark").tag(AppSettings.Appearance.dark)
-                    }
-                    .pickerStyle(.menu)
-                    .labelsHidden()
-                    .accessibilityLabel("App appearance")
-                    .frame(width: 140)
-                }
+                .padding(14)
+            }
+
+            SettingsSection(title: "About") {
+                Text("Watches your Google Calendar from the menu bar and puts a full-screen alert in front of you before each meeting, with a Join button for the video call and snooze. The bell shows the next meeting and its countdown; click it for the day-by-day list.")
+                    .font(.system(size: 12))
+                    .foregroundStyle(YCDesignSystem.Colors.textSecondary)
+                    .lineSpacing(4)
+                    .padding(14)
+            }
+
+            SettingsSection(title: "Updates") {
+                Text("Heads Up checks for updates every 6 hours, downloads them automatically, and installs them the next time it relaunches.")
+                    .font(.system(size: 12))
+                    .foregroundStyle(YCDesignSystem.Colors.textSecondary)
+                    .lineSpacing(4)
+                    .padding(14)
             }
         }
-    }
-
-    // MARK: - 8. Test
-
-    private var testSection: some View {
-        sectionCard("Test") {
-            HStack {
-                Spacer()
-                secondaryButton("Show test alert") { model.testAlert() }
-            }
-        }
-    }
-
-    // MARK: - 9. Updates
-
-    private var updatesSection: some View {
-        sectionCard("Updates") {
-            HStack {
-                VStack(alignment: .leading, spacing: YCDesignSystem.Spacing.xs) {
-                    Text(model.versionLabel)
-                        .font(YCDesignSystem.Typography.body)
-                        .foregroundStyle(YCDesignSystem.Colors.textPrimary)
-                    Text("Updates download automatically and install on relaunch.")
-                        .font(YCDesignSystem.Typography.bodySmall)
-                        .foregroundStyle(YCDesignSystem.Colors.textMuted)
-                }
-                Spacer()
-                secondaryButton("Check for Updates…") { model.checkForUpdates() }
-                    .disabled(!model.canCheckForUpdates)
-                    .opacity(model.canCheckForUpdates ? 1 : 0.5)
-            }
-        }
-    }
-
-    // MARK: - Shared row / card scaffolding
-
-    private func sectionCard<Content: View>(_ title: String, @ViewBuilder content: () -> Content) -> some View {
-        VStack(alignment: .leading, spacing: YCDesignSystem.Spacing.smd) {
-            Text(title)
-                .font(YCDesignSystem.Typography.h4)
-                .foregroundStyle(YCDesignSystem.Colors.textPrimary)
-            content()
-        }
-        .frame(maxWidth: .infinity, alignment: .leading)
-        .padding(YCDesignSystem.Spacing.md)
-        .background(
-            RoundedRectangle(cornerRadius: YCDesignSystem.CornerRadius.large)
-                .fill(YCDesignSystem.Colors.surface)
-        )
-        .overlay(
-            RoundedRectangle(cornerRadius: YCDesignSystem.CornerRadius.large)
-                .stroke(YCDesignSystem.Colors.border, lineWidth: 1)
-        )
-    }
-
-    /// Label left, control right, vertically centred: the preferences-pane
-    /// row rule from COMPONENT SPECS/17_PREFERENCES_PANE.md.
-    private func settingsRow<Control: View>(_ label: String, @ViewBuilder control: () -> Control) -> some View {
-        HStack {
-            Text(label)
-                .font(YCDesignSystem.Typography.body)
-                .foregroundStyle(YCDesignSystem.Colors.textPrimary)
-            Spacer()
-            control()
-        }
-        .frame(minHeight: YCDesignSystem.Rows.minHeight)
-    }
-
-    private func callout(_ text: String, background: Color, foreground: Color) -> some View {
-        Text(text)
-            .font(YCDesignSystem.Typography.bodySmall)
-            .foregroundStyle(foreground)
-            .fixedSize(horizontal: false, vertical: true)
-            .frame(maxWidth: .infinity, alignment: .leading)
-            .padding(YCDesignSystem.Spacing.smd)
-            .background(
-                RoundedRectangle(cornerRadius: YCDesignSystem.CornerRadius.medium)
-                    .fill(background)
-            )
-    }
-
-    private func primaryButton(_ title: String, disabled: Bool = false, action: @escaping () -> Void) -> some View {
-        Button(action: action) {
-            Text(title)
-                .font(YCDesignSystem.Typography.button)
-                .foregroundStyle(YCDesignSystem.Colors.textOnAccent)
-                .padding(.horizontal, YCDesignSystem.Spacing.md)
-                .frame(height: 36)
-                .background(disabled ? YCDesignSystem.Colors.disabledBg : YCDesignSystem.Colors.accent)
-                .clipShape(RoundedRectangle(cornerRadius: YCDesignSystem.CornerRadius.medium))
-        }
-        .buttonStyle(.plain)
-        .disabled(disabled)
-    }
-
-    private func secondaryButton(_ title: String, action: @escaping () -> Void) -> some View {
-        Button(action: action) {
-            Text(title)
-                .font(YCDesignSystem.Typography.button)
-                .foregroundStyle(YCDesignSystem.Colors.textPrimary)
-                .padding(.horizontal, YCDesignSystem.Spacing.md)
-                .frame(height: 36)
-                .overlay(
-                    RoundedRectangle(cornerRadius: YCDesignSystem.CornerRadius.medium)
-                        .stroke(YCDesignSystem.Colors.borderStrong, lineWidth: 1)
-                )
-        }
-        .buttonStyle(.plain)
-    }
-
-    private func destructiveOutlineButton(_ title: String, action: @escaping () -> Void) -> some View {
-        Button(action: action) {
-            Text(title)
-                .font(YCDesignSystem.Typography.button)
-                .foregroundStyle(YCDesignSystem.Colors.dangerText)
-                .padding(.horizontal, YCDesignSystem.Spacing.md)
-                .frame(height: 36)
-                .overlay(
-                    RoundedRectangle(cornerRadius: YCDesignSystem.CornerRadius.medium)
-                        .stroke(YCDesignSystem.Colors.dangerText, lineWidth: 1)
-                )
-        }
-        .buttonStyle(.plain)
-    }
-
-    private func quietButton(_ title: String, action: @escaping () -> Void) -> some View {
-        Button(action: action) {
-            Text(title)
-                .font(YCDesignSystem.Typography.label)
-                .foregroundStyle(YCDesignSystem.Colors.textSecondary)
-        }
-        .buttonStyle(.plain)
     }
 }
