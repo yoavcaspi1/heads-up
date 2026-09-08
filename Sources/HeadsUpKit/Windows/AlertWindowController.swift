@@ -313,13 +313,6 @@ final class AlertWindowController {
             effect.autoresizingMask = [.width, .height]
             container.addSubview(effect)
             effect.frame = container.bounds
-
-            let tint = NSHostingView(rootView: YCDesignSystem.Colors.canvas
-                .opacity(Double(settings.alertBlurIntensity) / 100.0)
-                .ignoresSafeArea())
-            tint.autoresizingMask = [.width, .height]
-            container.addSubview(tint)
-            tint.frame = container.bounds
         } else {
             let solid = NSHostingView(rootView: YCDesignSystem.Colors.canvas.ignoresSafeArea())
             solid.autoresizingMask = [.width, .height]

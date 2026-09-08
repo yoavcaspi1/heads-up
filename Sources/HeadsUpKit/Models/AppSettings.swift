@@ -27,8 +27,6 @@ struct AppSettings: Codable, Equatable {
     var menuBarCalendarEnabled: Bool
     /// Alert surface: opaque canvas colour, or native blur of what is behind.
     var alertBackground: AlertBackground
-    /// Frosted-tint strength over the blur, 0...100. Blur mode only.
-    var alertBlurIntensity: Int
     /// System / Light / Dark override for the whole app.
     var appearance: Appearance
     /// Which calendar app a clicked event opens in.
@@ -51,7 +49,6 @@ struct AppSettings: Codable, Equatable {
         disabledCalendars: [],
         menuBarCalendarEnabled: true,
         alertBackground: .solid,
-        alertBlurIntensity: 30,
         appearance: .system,
         eventOpenTarget: .googleWeb,
         alertTitleFont: .syne,
@@ -70,7 +67,6 @@ struct AppSettings: Codable, Equatable {
         out.disabledCalendars = input.disabledCalendars.filter { seen.insert($0).inserted }
         var seenSkips = Set<String>()
         out.skippedEvents = input.skippedEvents.filter { seenSkips.insert($0).inserted }
-        out.alertBlurIntensity = min(100, max(0, input.alertBlurIntensity))
         return out
     }
 
@@ -91,7 +87,6 @@ struct AppSettings: Codable, Equatable {
         self.disabledCalendars = (try? c.decode([String].self, forKey: .disabledCalendars)) ?? d.disabledCalendars
         self.menuBarCalendarEnabled = (try? c.decode(Bool.self, forKey: .menuBarCalendarEnabled)) ?? d.menuBarCalendarEnabled
         self.alertBackground = (try? c.decode(AlertBackground.self, forKey: .alertBackground)) ?? d.alertBackground
-        self.alertBlurIntensity = (try? c.decode(Int.self, forKey: .alertBlurIntensity)) ?? d.alertBlurIntensity
         self.appearance = (try? c.decode(Appearance.self, forKey: .appearance)) ?? d.appearance
         self.eventOpenTarget = (try? c.decode(EventOpenTarget.self, forKey: .eventOpenTarget)) ?? d.eventOpenTarget
         self.alertTitleFont = (try? c.decode(AlertTitleFont.self, forKey: .alertTitleFont)) ?? d.alertTitleFont
@@ -101,7 +96,7 @@ struct AppSettings: Codable, Equatable {
 
     init(alertLeadTimes: [Int], snoozeDurations: [Int], alertsEnabled: Bool,
          disabledCalendars: [String], menuBarCalendarEnabled: Bool,
-         alertBackground: AlertBackground, alertBlurIntensity: Int, appearance: Appearance,
+         alertBackground: AlertBackground, appearance: Appearance,
          eventOpenTarget: EventOpenTarget = .googleWeb, alertTitleFont: AlertTitleFont = .syne,
          skippedEvents: [String] = []) {
         self.alertLeadTimes = alertLeadTimes
@@ -110,7 +105,6 @@ struct AppSettings: Codable, Equatable {
         self.disabledCalendars = disabledCalendars
         self.menuBarCalendarEnabled = menuBarCalendarEnabled
         self.alertBackground = alertBackground
-        self.alertBlurIntensity = alertBlurIntensity
         self.appearance = appearance
         self.eventOpenTarget = eventOpenTarget
         self.alertTitleFont = alertTitleFont

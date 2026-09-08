@@ -12,7 +12,6 @@ func appSettingsTests() async {
         try expectEqual(s.disabledCalendars, [])
         try expect(s.menuBarCalendarEnabled)
         try expectEqual(s.alertBackground, .solid)
-        try expectEqual(s.alertBlurIntensity, 30)
         try expectEqual(s.appearance, .system)
         try expectEqual(s.eventOpenTarget, .googleWeb)
         try expectEqual(s.skippedEvents, [])
@@ -22,13 +21,11 @@ func appSettingsTests() async {
         var s = AppSettings.defaults
         s.alertLeadTimes = [7, 10]      // 7 not allowed, 10 allowed
         s.snoozeDurations = [99, 2]     // 99 not allowed, 2 allowed
-        s.alertBlurIntensity = 250
         s.disabledCalendars = ["a", "a", "b"]
         s.skippedEvents = ["k1", "k1", "k2"]
         let clean = AppSettings.sanitized(from: s)
         try expectEqual(clean.alertLeadTimes, [30, 10])   // falls back per index
         try expectEqual(clean.snoozeDurations, [1, 2])
-        try expectEqual(clean.alertBlurIntensity, 100)
         try expectEqual(Set(clean.disabledCalendars), Set(["a", "b"]))
         try expectEqual(clean.skippedEvents, ["k1", "k2"])
     }
@@ -39,6 +36,14 @@ func appSettingsTests() async {
         let legacy = #"{"alertLeadTimes":[30,5],"alertsEnabled":true}"#
         let decoded = try JSONDecoder().decode(AppSettings.self, from: Data(legacy.utf8))
         try expectEqual(decoded.skippedEvents, [])
+    }
+
+    await test("testDecodeIgnoresRetiredBlurIntensityField") {
+        // Settings files written by builds that still had the blur tint
+        // slider carry the old key; it must be ignored, not fail decoding.
+        let legacy = #"{"alertBackground":"blur","alertBlurIntensity":30}"#
+        let decoded = try JSONDecoder().decode(AppSettings.self, from: Data(legacy.utf8))
+        try expectEqual(decoded.alertBackground, .blur)
     }
 
     await test("testStoreRoundTripAndPatch") {
