@@ -97,7 +97,10 @@ public final class AppDelegate: NSObject, NSApplicationDelegate {
         settingsWindow = SettingsWindowController(
             settingsStore: settingsStore, credentials: credentials, registry: registry,
             calendarClient: calendarClient, scheduler: scheduler,
-            onTestAlert: { [weak self] in self?.showTestAlert() })
+            onTestAlert: { [weak self] in self?.showTestAlert() },
+            onCheckForUpdates: updaterController == nil ? nil : { [weak self] in
+                self?.updaterController?.checkForUpdates(nil)
+            })
         // A test-alert preview raises the Settings window above the alert so
         // the appearance controls stay reachable; undo that on any dismiss.
         alerts.onDismissed = { [weak self] in

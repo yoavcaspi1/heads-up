@@ -69,16 +69,21 @@ final class SettingsModel: ObservableObject {
     private let calendarClient: GoogleCalendarClient
     private let scheduler: Scheduler
     private let onTestAlert: () -> Void
+    /// nil when no updater is running (bare `swift run` builds have no
+    /// bundle for Sparkle to update); the button is disabled then.
+    private let onCheckForUpdates: (() -> Void)?
 
     init(settingsStore: SettingsStore, credentials: GoogleCredentialsStore,
          registry: GoogleAccountsRegistry, calendarClient: GoogleCalendarClient,
-         scheduler: Scheduler, onTestAlert: @escaping () -> Void) {
+         scheduler: Scheduler, onTestAlert: @escaping () -> Void,
+         onCheckForUpdates: (() -> Void)? = nil) {
         self.settingsStore = settingsStore
         self.credentials = credentials
         self.registry = registry
         self.calendarClient = calendarClient
         self.scheduler = scheduler
         self.onTestAlert = onTestAlert
+        self.onCheckForUpdates = onCheckForUpdates
 
         let s = settingsStore.settings
         alertsEnabled = s.alertsEnabled
@@ -317,6 +322,28 @@ final class SettingsModel: ObservableObject {
     func testAlert() {
         onTestAlert()
     }
+
+    // MARK: - Updates
+
+    var canCheckForUpdates: Bool { onCheckForUpdates != nil }
+
+    func checkForUpdates() {
+        onCheckForUpdates?()
+    }
+
+    /// "Heads Up 1.5.0 (37)" from the running bundle; a bare executable
+    /// has neither value and reads "Heads Up (development build)".
+    var versionLabel: String {
+        let info = Bundle.main.infoDictionary ?? [:]
+        return Self.versionLabel(short: info["CFBundleShortVersionString"] as? String,
+                                 build: info["CFBundleVersion"] as? String)
+    }
+
+    nonisolated static func versionLabel(short: String?, build: String?) -> String {
+        guard let short, !short.isEmpty else { return "Heads Up (development build)" }
+        if let build, !build.isEmpty { return "Heads Up \(short) (\(build))" }
+        return "Heads Up \(short)"
+    }
 }
 
 struct SettingsView: View {
@@ -343,6 +370,7 @@ struct SettingsView: View {
                 snoozeSection
                 appearanceSection
                 testSection
+                updatesSection
             }
             .padding(YCDesignSystem.Spacing.md)
         }
@@ -657,6 +685,27 @@ struct SettingsView: View {
             HStack {
                 Spacer()
                 secondaryButton("Show test alert") { model.testAlert() }
+            }
+        }
+    }
+
+    // MARK: - 9. Updates
+
+    private var updatesSection: some View {
+        sectionCard("Updates") {
+            HStack {
+                VStack(alignment: .leading, spacing: YCDesignSystem.Spacing.xs) {
+                    Text(model.versionLabel)
+                        .font(YCDesignSystem.Typography.body)
+                        .foregroundStyle(YCDesignSystem.Colors.textPrimary)
+                    Text("Updates download automatically and install on relaunch.")
+                        .font(YCDesignSystem.Typography.bodySmall)
+                        .foregroundStyle(YCDesignSystem.Colors.textMuted)
+                }
+                Spacer()
+                secondaryButton("Check for Updates…") { model.checkForUpdates() }
+                    .disabled(!model.canCheckForUpdates)
+                    .opacity(model.canCheckForUpdates ? 1 : 0.5)
             }
         }
     }

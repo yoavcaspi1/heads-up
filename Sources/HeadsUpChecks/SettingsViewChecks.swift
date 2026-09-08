@@ -10,6 +10,13 @@ func settingsViewTests() async {
         try expectEqual(leadTimeLabel(5), "5 minutes before")
     }
 
+    await test("testVersionLabel") {
+        try expectEqual(SettingsModel.versionLabel(short: "1.5.0", build: "37"), "Heads Up 1.5.0 (37)")
+        try expectEqual(SettingsModel.versionLabel(short: "1.5.0", build: nil), "Heads Up 1.5.0")
+        try expectEqual(SettingsModel.versionLabel(short: nil, build: nil), "Heads Up (development build)")
+        try expectEqual(SettingsModel.versionLabel(short: "", build: "3"), "Heads Up (development build)")
+    }
+
     await test("testTruncatedMiddleShortValuePassesThrough") {
         try expectEqual(truncatedMiddle("short-id"), "short-id")
     }

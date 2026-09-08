@@ -14,7 +14,8 @@ final class SettingsWindowController: NSObject, NSWindowDelegate {
 
     init(settingsStore: SettingsStore, credentials: GoogleCredentialsStore,
          registry: GoogleAccountsRegistry, calendarClient: GoogleCalendarClient,
-         scheduler: Scheduler, onTestAlert: @escaping () -> Void) {
+         scheduler: Scheduler, onTestAlert: @escaping () -> Void,
+         onCheckForUpdates: (() -> Void)? = nil) {
         // AppDelegate builds every window controller on the main thread
         // during applicationDidFinishLaunching. assumeIsolated documents
         // that existing guarantee to the type checker rather than spreading
@@ -24,7 +25,8 @@ final class SettingsWindowController: NSObject, NSWindowDelegate {
         let model = MainActor.assumeIsolated {
             SettingsModel(
                 settingsStore: settingsStore, credentials: credentials, registry: registry,
-                calendarClient: calendarClient, scheduler: scheduler, onTestAlert: onTestAlert)
+                calendarClient: calendarClient, scheduler: scheduler, onTestAlert: onTestAlert,
+                onCheckForUpdates: onCheckForUpdates)
         }
         self.model = model
         self.makeContent = { NSHostingView(rootView: SettingsView(model: model)) }
