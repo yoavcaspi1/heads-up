@@ -89,6 +89,9 @@ STAGE=$(mktemp -d)
 cp -R "$APP" "$STAGE/"
 ln -s /Applications "$STAGE/Applications"
 hdiutil create -volname "$APP_DISPLAY_NAME" -srcfolder "$STAGE" -ov -format UDZO "$DMG"
+# GitHub serves releases/latest/download/<asset> for any asset name, so a
+# fixed-name copy gives friends a download link that never changes.
+cp "$DMG" "$OUT/HeadsUp.dmg"
 ditto -c -k --keepParent "$APP" "$ZIP"
 
 echo "==> Signing the update zip (Sparkle EdDSA)"
@@ -138,5 +141,5 @@ git add appcast.xml
 git commit -m "release: Heads Up $VERSION"
 git tag "$TAG"
 git push origin main "$TAG"
-gh release create "$TAG" "$DMG" "$ZIP" --title "Heads Up $VERSION" --notes "$NOTES"
+gh release create "$TAG" "$DMG" "$ZIP" "$OUT/HeadsUp.dmg" --title "Heads Up $VERSION" --notes "$NOTES"
 echo "==> Done. Installed apps update within 6 hours."

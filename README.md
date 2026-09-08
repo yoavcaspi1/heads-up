@@ -18,7 +18,9 @@ number of minutes before each meeting.
 
 ## Install
 
-1. Download `HeadsUp-<latest>.dmg` from the
+1. Download
+   [HeadsUp.dmg](https://github.com/yoavcaspi1/heads-up/releases/latest/download/HeadsUp.dmg),
+   or see the
    [Releases page](https://github.com/yoavcaspi1/heads-up/releases/latest).
 2. Open it and drag **Heads Up** into the **Applications** folder.
 3. Open Heads Up from Applications. Look for the bell icon in the menu
@@ -34,6 +36,8 @@ calendar; it never changes anything.
 That is the whole setup, about a minute. More accounts can be added any
 time from Settings (right-click the bell). Requires macOS 14 (Sonoma) or
 later. No Terminal, no other installs.
+
+Heads Up has no Dock icon; it lives in the menu bar.
 
 ## Advanced: use your own Google client
 
