@@ -21,6 +21,7 @@ await trayModelTests()
 await calendarListModelTests()
 await settingsViewTests()
 await alertBackdropTests()
+await alertEscapeGateTests()
 await setupWizardModelTests()
 
 print("")

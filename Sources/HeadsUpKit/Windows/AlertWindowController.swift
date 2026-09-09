@@ -7,6 +7,20 @@ final class AlertPanel: NSPanel {
     override var canBecomeKey: Bool { true }
 }
 
+/// Escape arriving in the first moments after an alert appears is almost
+/// certainly not aimed at the alert: showing it activates the app and makes
+/// the panel key instantly, so a keystroke the user had already started in
+/// another app is routed here and would otherwise read as a deliberate
+/// dismissal, which also suppresses every later alert for that event.
+/// Pure so the timing rule can be checked without windows or a run loop.
+enum AlertEscapeGate {
+    static let grace: TimeInterval = 1.5
+
+    static func shouldDismiss(shownAt: Date, now: Date) -> Bool {
+        now.timeIntervalSince(shownAt) >= grace
+    }
+}
+
 /// One full-screen always-on-top window per display, covering the menu bar,
 /// following the user across Spaces and over full-screen apps.
 final class AlertWindowController {
@@ -29,6 +43,10 @@ final class AlertWindowController {
     /// newer show has moved things on, so a stale timer never acts on (or
     /// logs against) a newer alert's windows.
     private var showGeneration = 0
+    /// When the current show generation put an alert on screen. Feeds the
+    /// Escape grace period; reset per show so a content swap onto a second
+    /// event gets its own window of protection.
+    private var shownAt = Date.distantPast
     /// True once the app has been active at any point since the current
     /// show(). Distinguishes "the OS refused activation" (retry) from "the
     /// user deliberately switched away after we activated" (leave them be).
@@ -214,6 +232,7 @@ final class AlertWindowController {
     private func activateAndVerify(tag: String) {
         showGeneration += 1
         let generation = showGeneration
+        shownAt = Date()
         becameActiveSinceShow = NSApp.isActive
         if becameActiveObserver == nil {
             becameActiveObserver = NotificationCenter.default.addObserver(
@@ -229,8 +248,16 @@ final class AlertWindowController {
         if keyMonitor == nil {
             keyMonitor = NSEvent.addLocalMonitorForEvents(matching: .keyDown) { [weak self] e in
                 if e.keyCode == 53 {   // Escape
+                    // Swallow it either way: the alert is key, so passing it
+                    // on would send Escape to the alert's own view hierarchy
+                    // rather than back to the app the user was typing in.
+                    guard let self else { return nil }
+                    guard AlertEscapeGate.shouldDismiss(shownAt: self.shownAt, now: Date()) else {
+                        FileDiag.log("alert: escape within grace period, ignored")
+                        return nil
+                    }
                     FileDiag.log("alert: escape received, dismissing")
-                    self?.dismissByUser()
+                    self.dismissByUser()
                     return nil
                 }
                 return e
