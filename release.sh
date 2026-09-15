@@ -95,9 +95,12 @@ cp "$DMG" "$OUT/HeadsUp.dmg"
 ditto -c -k --keepParent "$APP" "$ZIP"
 
 echo "==> Signing the update zip (Sparkle EdDSA)"
-SIGN_TOOL=$(find "$BUILD_SRC/.build/artifacts" -name sign_update -type f -perm +111 2>/dev/null | head -1)
+# Search the whole .build tree: the universal build uses per-arch build
+# paths (.build/arm64, .build/x86_64), each with its own artifacts dir.
+SIGN_TOOL=$(find "$BUILD_SRC/.build" -name sign_update -type f -perm +111 \
+    -not -path "*dSYM*" 2>/dev/null | head -1)
 if [[ -z "$SIGN_TOOL" ]]; then
-    echo "Error: sign_update tool not found under .build/artifacts" >&2
+    echo "Error: sign_update tool not found under $BUILD_SRC/.build" >&2
     exit 1
 fi
 if [[ "$DRY_RUN" == "true" ]]; then

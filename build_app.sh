@@ -56,18 +56,47 @@ HARDENED="${HEADSUP_HARDENED:-false}"
 echo "==> Building Swift package ($CONFIG)..."
 # Only the app product: HeadsUpChecks needs -enable-testing on HeadsUpKit,
 # which is debug-only, so a plain `swift build -c release` cannot build it.
+# BUILD_ROOTS holds every build path used, for the Sparkle artifact lookup.
 if [[ "$UNIVERSAL" == "true" ]]; then
     # Two single-arch builds + lipo: `swift build --arch a --arch b` needs
     # full Xcode's xcbuild, which a CLT-only machine does not have.
-    swift build -c "$CONFIG" --product "$APP_NAME" --triple arm64-apple-macosx
-    swift build -c "$CONFIG" --product "$APP_NAME" --triple x86_64-apple-macosx
-    BIN_PATH=$(swift build -c "$CONFIG" --triple arm64-apple-macosx --show-bin-path)
-    BIN_PATH_X86=$(swift build -c "$CONFIG" --triple x86_64-apple-macosx --show-bin-path)
+    #
+    # Each arch gets its own --build-path. Swift 6.4's build system no longer
+    # separates outputs by triple, so a shared build path makes both builds
+    # report the same --show-bin-path and lipo fails with "same architectures".
+    BUILD_PATH_ARM=".build/arm64"
+    BUILD_PATH_X86=".build/x86_64"
+    swift build -c "$CONFIG" --product "$APP_NAME" --triple arm64-apple-macosx \
+        --build-path "$BUILD_PATH_ARM"
+    swift build -c "$CONFIG" --product "$APP_NAME" --triple x86_64-apple-macosx \
+        --build-path "$BUILD_PATH_X86"
+    BIN_PATH=$(swift build -c "$CONFIG" --triple arm64-apple-macosx \
+        --build-path "$BUILD_PATH_ARM" --show-bin-path)
+    BIN_PATH_X86=$(swift build -c "$CONFIG" --triple x86_64-apple-macosx \
+        --build-path "$BUILD_PATH_X86" --show-bin-path)
+    BUILD_ROOTS=("$BUILD_PATH_ARM" "$BUILD_PATH_X86")
+
+    # Guard against the build system quietly producing the wrong slice.
+    for spec in "arm64:$BIN_PATH/$APP_NAME" "x86_64:$BIN_PATH_X86/$APP_NAME"; do
+        want="${spec%%:*}"; bin="${spec#*:}"
+        if [[ ! -f "$bin" ]]; then
+            echo "Error: $want build produced no binary at $bin" >&2
+            exit 1
+        fi
+        got=$(lipo -archs "$bin" 2>/dev/null || echo "?")
+        if [[ "$got" != "$want" ]]; then
+            echo "Error: expected a $want binary at $bin but lipo reports '$got'." >&2
+            echo "       The two arch builds must not share a --build-path." >&2
+            exit 1
+        fi
+    done
+
     EXEC_PATH="$BIN_PATH/$APP_NAME-universal"
     lipo -create "$BIN_PATH/$APP_NAME" "$BIN_PATH_X86/$APP_NAME" -output "$EXEC_PATH"
 else
     swift build -c "$CONFIG" --product "$APP_NAME"
     BIN_PATH=$(swift build -c "$CONFIG" --show-bin-path)
+    BUILD_ROOTS=(".build")
     EXEC_PATH="$BIN_PATH/$APP_NAME"
 fi
 
@@ -88,11 +117,13 @@ cp "$EXEC_PATH" "$APP_BUNDLE/Contents/MacOS/$APP_NAME"
 # resources live in the HeadsUpKit library target, so SPM names the
 # generated bundle after the package and that target, not after the
 # HeadsUp executable.
-RES_BUNDLE="$BIN_PATH/${APP_NAME}_HeadsUpKit.bundle"
-if [[ -d "$RES_BUNDLE" ]]; then
+# Newer toolchains nest it a level deeper, so locate it rather than assume.
+RES_BUNDLE=$(find "$BIN_PATH" -maxdepth 2 -type d \
+    -name "${APP_NAME}_HeadsUpKit.bundle" 2>/dev/null | head -1)
+if [[ -n "$RES_BUNDLE" && -d "$RES_BUNDLE" ]]; then
     cp -R "$RES_BUNDLE" "$APP_BUNDLE/Contents/Resources/"
 else
-    echo "Warning: SPM resource bundle not found at $RES_BUNDLE" >&2
+    echo "Warning: SPM resource bundle ${APP_NAME}_HeadsUpKit.bundle not found under $BIN_PATH" >&2
 fi
 
 # Copy the app icon directly too, so CFBundleIconFile resolves it at the top
@@ -104,10 +135,10 @@ else
 fi
 
 # Embed Sparkle.framework (SPM ships it as a prebuilt universal artifact).
-SPARKLE_FW=$(find .build/artifacts -type d -name "Sparkle.framework" \
+SPARKLE_FW=$(find "${BUILD_ROOTS[@]}" -type d -name "Sparkle.framework" \
     -not -path "*dSYM*" 2>/dev/null | head -1)
 if [[ -z "$SPARKLE_FW" ]]; then
-    echo "Error: Sparkle.framework not found under .build/artifacts (run swift build first)" >&2
+    echo "Error: Sparkle.framework not found under ${BUILD_ROOTS[*]} (run swift build first)" >&2
     exit 1
 fi
 mkdir -p "$APP_BUNDLE/Contents/Frameworks"
