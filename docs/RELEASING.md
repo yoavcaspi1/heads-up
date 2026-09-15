@@ -36,6 +36,12 @@ Internal notes for the maintainer. Friends never need this file.
 ## Every release
 
 1. Make the changes; run `swift run HeadsUpChecks` until green.
+   While Command Line Tools 27.0 is installed without Xcode, run it as
+   `SDKROOT=/Library/Developer/CommandLineTools/SDKs/MacOSX26.5.sdk swift run HeadsUpChecks`:
+   the 27.0 SDK declares SwiftUI's `@State` as a macro whose SwiftUIMacros
+   plugin the Command Line Tools do not ship, so the build fails with
+   "plugin for module 'SwiftUIMacros' not found". `build_app.sh` already
+   pins the same SDK for itself.
 2. Bump `VERSION` (semantic-ish: X.Y.Z), commit everything.
 3. `./release.sh`
 

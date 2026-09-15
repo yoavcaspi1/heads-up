@@ -17,6 +17,16 @@
 set -euo pipefail
 cd "$(dirname "$0")"
 
+# Command Line Tools 27.0 points MacOSX.sdk at the 27.0 SDK, whose SwiftUI
+# declares @State as a macro implemented by a SwiftUIMacros plugin that the
+# Command Line Tools do not ship, so every SwiftUI build fails with
+# "plugin for module 'SwiftUIMacros' not found". The 26.5 SDK is still
+# installed and builds fine. Drop this block once Xcode or a fixed
+# Command Line Tools release is installed.
+if [[ -z "${SDKROOT:-}" && -d /Library/Developer/CommandLineTools/SDKs/MacOSX26.5.sdk ]]; then
+    export SDKROOT=/Library/Developer/CommandLineTools/SDKs/MacOSX26.5.sdk
+fi
+
 FORCE_INSTALL=false
 NO_INSTALL=false
 CONFIG="debug"
