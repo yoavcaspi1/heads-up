@@ -11,6 +11,7 @@ func appSettingsTests() async {
         try expect(s.alertsEnabled)
         try expectEqual(s.disabledCalendars, [])
         try expect(s.menuBarCalendarEnabled)
+        try expectEqual(s.menuBarLeadMinutes, 1440)
         try expectEqual(s.alertBackground, .frosted)
         try expectEqual(s.appearance, .system)
         try expectEqual(s.eventOpenTarget, .googleWeb)
@@ -23,11 +24,13 @@ func appSettingsTests() async {
         s.snoozeDurations = [99, 2]     // 99 not allowed, 2 allowed
         s.disabledCalendars = ["a", "a", "b"]
         s.skippedEvents = ["k1", "k1", "k2"]
+        s.menuBarLeadMinutes = 7          // not in the allowed list
         let clean = AppSettings.sanitized(from: s)
         try expectEqual(clean.alertLeadTimes, [30, 10])   // falls back per index
         try expectEqual(clean.snoozeDurations, [1, 2])
         try expectEqual(Set(clean.disabledCalendars), Set(["a", "b"]))
         try expectEqual(clean.skippedEvents, ["k1", "k2"])
+        try expectEqual(clean.menuBarLeadMinutes, 1440)   // falls back to the default
     }
 
     await test("testDecodeWithoutSkippedEventsFieldDefaultsEmpty") {
@@ -36,6 +39,20 @@ func appSettingsTests() async {
         let legacy = #"{"alertLeadTimes":[30,5],"alertsEnabled":true}"#
         let decoded = try JSONDecoder().decode(AppSettings.self, from: Data(legacy.utf8))
         try expectEqual(decoded.skippedEvents, [])
+    }
+
+    await test("testMenuBarLeadMinutesDecodesAndRoundtrips") {
+        // Settings written before the field existed keep the 24 hour window.
+        let legacy = try JSONDecoder().decode(AppSettings.self, from: Data("{}".utf8))
+        try expectEqual(legacy.menuBarLeadMinutes, 1440)
+        var s = AppSettings.defaults
+        s.menuBarLeadMinutes = 120
+        let round = try JSONDecoder().decode(AppSettings.self, from: JSONEncoder().encode(s))
+        try expectEqual(round.menuBarLeadMinutes, 120)
+        // An out-of-range persisted value is sanitized on decode.
+        let bad = #"{"menuBarLeadMinutes":37}"#
+        let decoded = try JSONDecoder().decode(AppSettings.self, from: Data(bad.utf8))
+        try expectEqual(decoded.menuBarLeadMinutes, 1440)
     }
 
     await test("testDecodeIgnoresRetiredBlurIntensityField") {

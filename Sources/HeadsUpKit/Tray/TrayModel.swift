@@ -3,7 +3,9 @@ import Foundation
 struct TrayState: Equatable {
     let title: String
     let tooltip: String
-    let meetingsRemainToday: Bool
+    /// True when a meeting is being shown in the menu bar title, which is
+    /// also what tints the bell active.
+    let showsMeeting: Bool
 }
 
 /// Pure menu bar state derivation. All AppKit stays in TrayController.
@@ -38,6 +40,14 @@ enum TrayModel {
         return "now"
     }
 
+    /// Human label for the menu bar lead window, used in the empty-state
+    /// tooltip: "45 min", "1 hour", "2 hours", "24 hours".
+    static func leadWindowLabel(minutes: Int) -> String {
+        if minutes < 60 { return "\(minutes) min" }
+        let hours = minutes / 60
+        return hours == 1 ? "1 hour" : "\(hours) hours"
+    }
+
     /// The event(s) to show: next upcoming (plus simultaneous starters), else
     /// ongoing (plus simultaneous starters), else none. All-day excluded.
     static func nextEvents(_ events: [CalendarEvent], now: Date) -> [CalendarEvent] {
@@ -63,12 +73,16 @@ enum TrayModel {
             .sorted { $0.start < $1.start }
     }
 
-    static func state(events: [CalendarEvent], now: Date, calendar: Calendar) -> TrayState {
+    /// `leadMinutes`: how far ahead of its start a meeting may appear in the
+    /// title. A meeting already in progress shows whatever the window is.
+    static func state(events: [CalendarEvent], now: Date, leadMinutes: Int) -> TrayState {
         let chosen = nextEvents(events, now: now)
-        guard let first = chosen.first, calendar.isDate(first.start, inSameDayAs: now) else {
+        let window = Double(leadMinutes) * 60
+        guard let first = chosen.first,
+              first.start.timeIntervalSince(now) <= window else {
             return TrayState(title: "",
-                             tooltip: "Heads Up - no more meetings today",
-                             meetingsRemainToday: false)
+                             tooltip: "Heads Up - no meeting in the next \(leadWindowLabel(minutes: leadMinutes))",
+                             showsMeeting: false)
         }
         let titles = chosen.map(\.title).joined(separator: " & ")
         // Same wording source as the calendar rows: countdown before start,
@@ -81,6 +95,6 @@ enum TrayModel {
             .joined(separator: " · ")
         return TrayState(title: title,
                          tooltip: "\(titles)\n\(details)",
-                         meetingsRemainToday: true)
+                         showsMeeting: true)
     }
 }

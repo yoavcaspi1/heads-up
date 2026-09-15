@@ -45,6 +45,10 @@ struct AppSettings: Codable, Equatable {
     var disabledCalendars: [String]
     /// Whether the menu bar item is shown.
     var menuBarCalendarEnabled: Bool
+    /// How far ahead of its start a meeting appears in the menu bar title.
+    /// Outside this window the menu bar is icon-only. Ongoing meetings show
+    /// regardless.
+    var menuBarLeadMinutes: Int
     /// Alert surface: opaque canvas colour, or the frosted bundled backdrop.
     var alertBackground: AlertBackground
     /// System / Light / Dark override for the whole app.
@@ -61,6 +65,10 @@ struct AppSettings: Codable, Equatable {
 
     static let allowedLeadTimes = [0, 1, 2, 5, 10, 15, 30, 60]
     static let allowedSnoozeMinutes = [1, 2, 5, 10, 15, 30, 60]
+    static let allowedMenuBarLeadMinutes = [1, 2, 5, 10, 15, 30, 45, 60, 120, 180, 240, 360, 480, 720, 1440]
+    /// Standalone so the memberwise init can default to it without
+    /// referring to `defaults`, which that same init builds.
+    static let defaultMenuBarLeadMinutes = 1440
 
     static let defaults = AppSettings(
         alertLeadTimes: [30, 5],
@@ -68,6 +76,7 @@ struct AppSettings: Codable, Equatable {
         alertsEnabled: true,
         disabledCalendars: [],
         menuBarCalendarEnabled: true,
+        menuBarLeadMinutes: defaultMenuBarLeadMinutes,
         alertBackground: .frosted,
         appearance: .system,
         eventOpenTarget: .googleWeb,
@@ -83,6 +92,9 @@ struct AppSettings: Codable, Equatable {
             input.alertLeadTimes, allowed: allowedLeadTimes, fallback: defaults.alertLeadTimes)
         out.snoozeDurations = sanitizedPair(
             input.snoozeDurations, allowed: allowedSnoozeMinutes, fallback: defaults.snoozeDurations)
+        if !allowedMenuBarLeadMinutes.contains(input.menuBarLeadMinutes) {
+            out.menuBarLeadMinutes = defaultMenuBarLeadMinutes
+        }
         var seen = Set<String>()
         out.disabledCalendars = input.disabledCalendars.filter { seen.insert($0).inserted }
         var seenSkips = Set<String>()
@@ -106,6 +118,7 @@ struct AppSettings: Codable, Equatable {
         self.alertsEnabled = (try? c.decode(Bool.self, forKey: .alertsEnabled)) ?? d.alertsEnabled
         self.disabledCalendars = (try? c.decode([String].self, forKey: .disabledCalendars)) ?? d.disabledCalendars
         self.menuBarCalendarEnabled = (try? c.decode(Bool.self, forKey: .menuBarCalendarEnabled)) ?? d.menuBarCalendarEnabled
+        self.menuBarLeadMinutes = (try? c.decode(Int.self, forKey: .menuBarLeadMinutes)) ?? d.menuBarLeadMinutes
         self.alertBackground = (try? c.decode(AlertBackground.self, forKey: .alertBackground)) ?? d.alertBackground
         self.appearance = (try? c.decode(Appearance.self, forKey: .appearance)) ?? d.appearance
         self.eventOpenTarget = (try? c.decode(EventOpenTarget.self, forKey: .eventOpenTarget)) ?? d.eventOpenTarget
@@ -116,6 +129,7 @@ struct AppSettings: Codable, Equatable {
 
     init(alertLeadTimes: [Int], snoozeDurations: [Int], alertsEnabled: Bool,
          disabledCalendars: [String], menuBarCalendarEnabled: Bool,
+         menuBarLeadMinutes: Int = AppSettings.defaultMenuBarLeadMinutes,
          alertBackground: AlertBackground, appearance: Appearance,
          eventOpenTarget: EventOpenTarget = .googleWeb, alertTitleFont: AlertTitleFont = .syne,
          skippedEvents: [String] = []) {
@@ -124,6 +138,7 @@ struct AppSettings: Codable, Equatable {
         self.alertsEnabled = alertsEnabled
         self.disabledCalendars = disabledCalendars
         self.menuBarCalendarEnabled = menuBarCalendarEnabled
+        self.menuBarLeadMinutes = menuBarLeadMinutes
         self.alertBackground = alertBackground
         self.appearance = appearance
         self.eventOpenTarget = eventOpenTarget

@@ -8,6 +8,14 @@ func leadTimeLabel(_ minutes: Int) -> String {
     minutes == 0 ? "At event start" : "\(minutes) minute\(minutes == 1 ? "" : "s") before"
 }
 
+/// Menu bar lead-window picker label: "1 minute before", "45 minutes before",
+/// "1 hour before", "24 hours before". Internal so checks can cover it.
+func menuBarLeadLabel(_ minutes: Int) -> String {
+    if minutes < 60 { return "\(minutes) minute\(minutes == 1 ? "" : "s") before" }
+    let hours = minutes / 60
+    return "\(hours) hour\(hours == 1 ? "" : "s") before"
+}
+
 /// Middle-truncates a saved OAuth client ID for display, e.g.
 /// "123456789012-abc...xyz.apps.googleusercontent.com" -> shortened. Never
 /// applied to the client secret, which is never displayed at all.
@@ -28,6 +36,7 @@ final class SettingsModel: ObservableObject {
 
     @Published var alertsEnabled: Bool
     @Published var menuBarCalendarEnabled: Bool
+    @Published var menuBarLeadMinutes: Int
 
     // MARK: Google connection
 
@@ -88,6 +97,7 @@ final class SettingsModel: ObservableObject {
         let s = settingsStore.settings
         alertsEnabled = s.alertsEnabled
         menuBarCalendarEnabled = s.menuBarCalendarEnabled
+        menuBarLeadMinutes = s.menuBarLeadMinutes
         alertLeadTimes = s.alertLeadTimes
         snoozeDurations = s.snoozeDurations
         alertBackground = s.alertBackground
@@ -114,6 +124,7 @@ final class SettingsModel: ObservableObject {
     private func applySettings(_ s: AppSettings) {
         alertsEnabled = s.alertsEnabled
         menuBarCalendarEnabled = s.menuBarCalendarEnabled
+        menuBarLeadMinutes = s.menuBarLeadMinutes
         alertLeadTimes = s.alertLeadTimes
         snoozeDurations = s.snoozeDurations
         alertBackground = s.alertBackground
@@ -143,6 +154,10 @@ final class SettingsModel: ObservableObject {
 
     func setMenuBarCalendarEnabled(_ value: Bool) {
         settingsStore.update { $0.menuBarCalendarEnabled = value }
+    }
+
+    func setMenuBarLeadMinutes(_ value: Int) {
+        settingsStore.update { $0.menuBarLeadMinutes = value }
     }
 
     // MARK: - Google connection
@@ -438,10 +453,20 @@ struct SettingsView: View {
                         .accessibilityLabel("Full-screen alerts")
                 }
                 SettingsRow(title: "Menu bar calendar",
-                            subtitle: "Show the next meeting and its countdown in the menu bar; click it for the day list.",
-                            showDivider: false) {
+                            subtitle: "Show the next meeting and its countdown in the menu bar; click it for the day list.") {
                     SettingsToggle(isOn: Binding(get: { model.menuBarCalendarEnabled }, set: model.setMenuBarCalendarEnabled))
                         .accessibilityLabel("Menu bar calendar")
+                }
+                SettingsRow(title: "Show in menu bar",
+                            subtitle: "How far ahead the next meeting appears in the menu bar.",
+                            showDivider: false) {
+                    SettingsPicker(selection: Binding(get: { model.menuBarLeadMinutes },
+                                                     set: model.setMenuBarLeadMinutes)) {
+                        ForEach(AppSettings.allowedMenuBarLeadMinutes, id: \.self) { minutes in
+                            Text(menuBarLeadLabel(minutes)).tag(minutes)
+                        }
+                    }
+                    .accessibilityLabel("Show in menu bar")
                 }
             }
 

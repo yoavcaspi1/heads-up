@@ -29,9 +29,9 @@ func trayModelTests() async {
     await test("testSimultaneousMeetingsJoined") {
         let a = trayChecksEvent("A", startMin: 15, endMin: 45)
         let b = trayChecksEvent("B", startMin: 15, endMin: 60)
-        let state = TrayModel.state(events: [a, b], now: trayChecksNow, calendar: .current)
+        let state = TrayModel.state(events: [a, b], now: trayChecksNow, leadMinutes: 1440)
         try expect(state.title.hasPrefix("A & B") || state.title.hasPrefix("B & A"))
-        try expect(state.meetingsRemainToday)
+        try expect(state.showsMeeting)
     }
 
     await test("testAllDayIgnored") {
@@ -39,12 +39,47 @@ func trayModelTests() async {
         try expect(TrayModel.nextEvents([allDay], now: trayChecksNow).isEmpty)
     }
 
-    await test("testTomorrowMeetingShowsIconOnly") {
+    await test("testMeetingBeyondWindowShowsIconOnly") {
+        // 90 minutes out: inside a 2 hour window, outside a 1 hour one.
+        let later = trayChecksEvent("Later", startMin: 90, endMin: 120)
+        let shown = TrayModel.state(events: [later], now: trayChecksNow, leadMinutes: 120)
+        try expect(shown.title.hasPrefix("Later"))
+        try expect(shown.showsMeeting)
+
+        let hidden = TrayModel.state(events: [later], now: trayChecksNow, leadMinutes: 60)
+        try expectEqual(hidden.title, "")
+        try expect(!hidden.showsMeeting)
+        try expect(hidden.tooltip.contains("no meeting in the next 1 hour"))
+    }
+
+    await test("testOngoingMeetingShowsRegardlessOfWindow") {
+        let ongoing = trayChecksEvent("Ongoing", startMin: -10, endMin: 50)
+        let state = TrayModel.state(events: [ongoing], now: trayChecksNow, leadMinutes: 1)
+        try expect(state.title.hasPrefix("Ongoing"))
+        try expect(state.showsMeeting)
+    }
+
+    await test("testTomorrowMeetingNeedsTheFullDayWindow") {
+        // 26 hours out: hidden even at the widest window; 20 hours out shows.
         let tomorrow = trayChecksEvent("Tomorrow", startMin: 60 * 26, endMin: 60 * 27)
-        let state = TrayModel.state(events: [tomorrow], now: trayChecksNow, calendar: .current)
-        try expectEqual(state.title, "")
-        try expect(!state.meetingsRemainToday)
-        try expect(state.tooltip.contains("no more meetings today"))
+        let outside = TrayModel.state(events: [tomorrow], now: trayChecksNow, leadMinutes: 1440)
+        try expectEqual(outside.title, "")
+        try expect(!outside.showsMeeting)
+        try expect(outside.tooltip.contains("no meeting in the next 24 hours"))
+
+        let tonight = trayChecksEvent("Tonight", startMin: 60 * 20, endMin: 60 * 21)
+        let inside = TrayModel.state(events: [tonight], now: trayChecksNow, leadMinutes: 1440)
+        try expect(inside.showsMeeting)
+        let narrow = TrayModel.state(events: [tonight], now: trayChecksNow, leadMinutes: 720)
+        try expect(!narrow.showsMeeting)
+    }
+
+    await test("testLeadWindowLabel") {
+        try expectEqual(TrayModel.leadWindowLabel(minutes: 1), "1 min")
+        try expectEqual(TrayModel.leadWindowLabel(minutes: 45), "45 min")
+        try expectEqual(TrayModel.leadWindowLabel(minutes: 60), "1 hour")
+        try expectEqual(TrayModel.leadWindowLabel(minutes: 120), "2 hours")
+        try expectEqual(TrayModel.leadWindowLabel(minutes: 1440), "24 hours")
     }
 
     await test("testCountdownFormats") {
@@ -71,7 +106,7 @@ func trayModelTests() async {
 
     await test("testOngoingTrayTitleSaysNow") {
         let ongoing = trayChecksEvent("Ongoing", startMin: -10, endMin: 20)
-        let state = TrayModel.state(events: [ongoing], now: trayChecksNow, calendar: .current)
+        let state = TrayModel.state(events: [ongoing], now: trayChecksNow, leadMinutes: 1440)
         try expect(state.title.contains("(now)"))
     }
 

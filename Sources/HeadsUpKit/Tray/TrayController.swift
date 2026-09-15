@@ -35,6 +35,9 @@ final class TrayController: NSObject {
     func applySetting() {
         if settingsStore.settings.menuBarCalendarEnabled {
             create()
+            // Redraw now: an already-created item would otherwise keep a
+            // stale title until the next 30 s tick after a settings change.
+            tick()
         } else {
             destroy()
         }
@@ -151,12 +154,13 @@ final class TrayController: NSObject {
         guard let button = statusItem?.button else { return }
         // trayEvents, not cachedEvents: skipped meetings never surface in
         // the menu bar title.
-        let state = TrayModel.state(events: scheduler.trayEvents, now: Date(), calendar: .current)
+        let state = TrayModel.state(events: scheduler.trayEvents, now: Date(),
+                                    leadMinutes: settingsStore.settings.menuBarLeadMinutes)
         button.title = state.title.isEmpty ? "" : " \(state.title)"
         button.toolTip = state.tooltip
-        if lastActive != state.meetingsRemainToday {
-            lastActive = state.meetingsRemainToday
-            let color = state.meetingsRemainToday ? Self.activeColor : Self.doneColor
+        if lastActive != state.showsMeeting {
+            lastActive = state.showsMeeting
+            let color = state.showsMeeting ? Self.activeColor : Self.doneColor
             let config = NSImage.SymbolConfiguration(pointSize: 15, weight: .regular)
                 .applying(NSImage.SymbolConfiguration(paletteColors: [color]))
             let image = NSImage(systemSymbolName: "bell", accessibilityDescription: "Heads Up")?

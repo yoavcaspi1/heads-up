@@ -10,6 +10,15 @@ func settingsViewTests() async {
         try expectEqual(leadTimeLabel(5), "5 minutes before")
     }
 
+    await test("testMenuBarLeadLabel") {
+        try expectEqual(menuBarLeadLabel(1), "1 minute before")
+        try expectEqual(menuBarLeadLabel(5), "5 minutes before")
+        try expectEqual(menuBarLeadLabel(45), "45 minutes before")
+        try expectEqual(menuBarLeadLabel(60), "1 hour before")
+        try expectEqual(menuBarLeadLabel(120), "2 hours before")
+        try expectEqual(menuBarLeadLabel(1440), "24 hours before")
+    }
+
     await test("testVersionLabel") {
         try expectEqual(SettingsModel.versionLabel(short: "1.5.0", build: "37"), "Heads Up 1.5.0 (37)")
         try expectEqual(SettingsModel.versionLabel(short: "1.5.0", build: nil), "Heads Up 1.5.0")
