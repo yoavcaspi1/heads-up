@@ -288,17 +288,10 @@ struct CalendarListView: View {
         private func rowContent(now: Date?) -> some View {
             HStack(spacing: YCDesignSystem.Spacing.sm) {
                 VStack(alignment: .leading, spacing: YCDesignSystem.Spacing.xs) {
-                    HStack(spacing: YCDesignSystem.Spacing.xs) {
-                        Text(event.title)
-                            .font(YCDesignSystem.Typography.body)
-                            .foregroundStyle(isToday ? YCDesignSystem.Colors.accent : YCDesignSystem.Colors.textPrimary)
-                            .lineLimit(1)
-                        if event.meetingUrl != nil {
-                            Image(systemName: "video")
-                                .imageScale(.small)
-                                .foregroundStyle(YCDesignSystem.Colors.textSecondary)
-                        }
-                    }
+                    Text(event.title)
+                        .font(YCDesignSystem.Typography.body)
+                        .foregroundStyle(isToday ? YCDesignSystem.Colors.accent : YCDesignSystem.Colors.textPrimary)
+                        .lineLimit(1)
                     Text(timeRange)
                         .font(YCDesignSystem.Typography.code)
                         .foregroundStyle(YCDesignSystem.Colors.textSecondary)
@@ -311,9 +304,39 @@ struct CalendarListView: View {
                         .font(YCDesignSystem.Typography.code)
                         .foregroundStyle(YCDesignSystem.Colors.accent)
                 }
+                // Right of the countdown: a real Join control for rows that
+                // carry a meeting link. The Button consumes its own tap, so
+                // the row's open-in-calendar gesture never fires from here.
+                if let url = event.meetingUrl.flatMap(URL.init(string:)) {
+                    joinButton(url: url)
+                }
             }
             .padding(.horizontal, YCDesignSystem.Spacing.sm)
             .padding(.vertical, YCDesignSystem.Spacing.xs)
+        }
+
+        private static let joinButtonHeight: CGFloat = 24
+
+        private func joinButton(url: URL) -> some View {
+            Button {
+                NSWorkspace.shared.open(url)
+            } label: {
+                HStack(spacing: YCDesignSystem.Spacing.xs) {
+                    Image(systemName: "video")
+                        .imageScale(.small)
+                    Text("Join")
+                }
+                .font(YCDesignSystem.Typography.button)
+                .foregroundStyle(YCDesignSystem.Colors.textOnAccent)
+                .padding(.horizontal, YCDesignSystem.Spacing.sm)
+                .frame(height: Self.joinButtonHeight)
+                .background(YCDesignSystem.Colors.accent)
+                .clipShape(RoundedRectangle(cornerRadius: YCDesignSystem.CornerRadius.medium))
+                .contentShape(RoundedRectangle(cornerRadius: YCDesignSystem.CornerRadius.medium))
+            }
+            .buttonStyle(.plain)
+            .focusEffectDisabled()
+            .accessibilityLabel("Join \(event.title)")
         }
 
         private var timeRange: String {
