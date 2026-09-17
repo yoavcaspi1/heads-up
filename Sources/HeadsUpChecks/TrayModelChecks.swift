@@ -120,4 +120,88 @@ func trayModelTests() async {
                                             now: trayChecksNow, calendar: .current)
         try expectEqual(out.map(\.title), ["Ongoing", "Upcoming"])
     }
+
+    await test("testSnoozableExcludesMeetingsAlreadyStarted") {
+        let ongoing = trayChecksEvent("Ongoing", startMin: -10, endMin: 20)
+        let upcoming = trayChecksEvent("Upcoming", startMin: 30, endMin: 60)
+        let out = TrayModel.snoozableEvents([ongoing, upcoming], now: trayChecksNow, calendar: .current)
+        try expectEqual(out.map(\.title), ["Upcoming"])
+    }
+
+    await test("testAvailableSnoozeLeadsDropPastRevealTimes") {
+        // 20 minutes out: 5, 10 and 15 still lie ahead; 30 and 60 do not.
+        let soon = trayChecksEvent("Soon", startMin: 20, endMin: 50)
+        try expectEqual(TrayModel.availableSnoozeLeads(for: soon, now: trayChecksNow), [5, 10, 15])
+        let later = trayChecksEvent("Later", startMin: 180, endMin: 210)
+        try expectEqual(TrayModel.availableSnoozeLeads(for: later, now: trayChecksNow), [5, 10, 15, 30, 60])
+    }
+
+    await test("testSnoozedMeetingHiddenUntilRevealThenShows") {
+        let meeting = trayChecksEvent("Standup", startMin: 60, endMin: 90)
+        let snoozes = [meeting.schedulerKey: 10]
+        // Before reveal (start minus 10 min) it is out of the menu bar.
+        try expect(TrayModel.isMenuBarSnoozed(event: meeting, snoozes: snoozes, now: trayChecksNow))
+        try expect(TrayModel.menuBarEvents([meeting], skipped: [], snoozes: snoozes,
+                                           now: trayChecksNow).isEmpty)
+        let hidden = TrayModel.state(
+            events: TrayModel.menuBarEvents([meeting], skipped: [], snoozes: snoozes, now: trayChecksNow),
+            now: trayChecksNow, leadMinutes: 1440)
+        try expectEqual(hidden.title, "")
+        try expect(!hidden.showsMeeting)
+
+        // At start minus 9 minutes the snooze is spent and it is back.
+        let afterReveal = trayChecksNow.addingTimeInterval(51 * 60)
+        try expect(!TrayModel.isMenuBarSnoozed(event: meeting, snoozes: snoozes, now: afterReveal))
+        let shown = TrayModel.state(
+            events: TrayModel.menuBarEvents([meeting], skipped: [], snoozes: snoozes, now: afterReveal),
+            now: afterReveal, leadMinutes: 1440)
+        try expect(shown.title.hasPrefix("Standup"))
+        try expect(shown.showsMeeting)
+    }
+
+    await test("testSnoozedMeetingLetsTheNextOneTakeOver") {
+        let first = trayChecksEvent("First", startMin: 20, endMin: 40)
+        let second = trayChecksEvent("Second", startMin: 45, endMin: 75)
+        let events = TrayModel.menuBarEvents([first, second], skipped: [],
+                                             snoozes: [first.schedulerKey: 5], now: trayChecksNow)
+        let state = TrayModel.state(events: events, now: trayChecksNow, leadMinutes: 1440)
+        try expect(state.title.hasPrefix("Second"))
+        try expect(state.showsMeeting)
+        // Narrow window and nothing else eligible: icon only.
+        let iconOnly = TrayModel.state(
+            events: TrayModel.menuBarEvents([first], skipped: [],
+                                            snoozes: [first.schedulerKey: 5], now: trayChecksNow),
+            now: trayChecksNow, leadMinutes: 60)
+        try expectEqual(iconOnly.title, "")
+        try expect(!iconOnly.showsMeeting)
+    }
+
+    await test("testSkipAndSnoozeFilteringCompose") {
+        let skippedMeeting = trayChecksEvent("Skipped", startMin: 10, endMin: 40)
+        let snoozedMeeting = trayChecksEvent("Snoozed", startMin: 20, endMin: 50)
+        let plain = trayChecksEvent("Plain", startMin: 30, endMin: 60)
+        let out = TrayModel.menuBarEvents([skippedMeeting, snoozedMeeting, plain],
+                                          skipped: [skippedMeeting.schedulerKey],
+                                          snoozes: [snoozedMeeting.schedulerKey: 5],
+                                          now: trayChecksNow)
+        try expectEqual(out.map(\.title), ["Plain"])
+    }
+
+    await test("testStaleSnoozeKeysDroppedOnceSpentOrGone") {
+        let live = trayChecksEvent("Live", startMin: 60, endMin: 90)
+        let spent = trayChecksEvent("Spent", startMin: 3, endMin: 40)
+        let snoozes = [live.schedulerKey: 10, spent.schedulerKey: 10, "gone::key": 5]
+        let stale = TrayModel.staleMenuBarSnoozeKeys(snoozes, events: [live, spent], now: trayChecksNow)
+        try expectEqual(stale, Set([spent.schedulerKey, "gone::key"]))
+    }
+
+    await test("testMenuBarSnoozeLeavesAlertPlanningAlone") {
+        // The snooze is a menu bar surface only: AlertPlanner never sees it.
+        let meeting = trayChecksEvent("Standup", startMin: 60, endMin: 90)
+        var settings = AppSettings.defaults
+        settings.menuBarSnoozes = [meeting.schedulerKey: 10]
+        let plans = AlertPlanner.plan(events: [meeting], settings: settings, now: trayChecksNow,
+                                      fired: [], snoozedKeys: [])
+        try expectEqual(Set(plans.map(\.leadMinutes)), Set(settings.alertLeadTimes))
+    }
 }

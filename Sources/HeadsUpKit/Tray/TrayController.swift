@@ -89,7 +89,8 @@ final class TrayController: NSObject {
         // Skip meeting: today's remaining meetings, checkmarked when already
         // skipped. Skipping hides the meeting from the menu bar title and
         // suppresses its alerts; clicking a checkmarked one un-skips it.
-        let skippable = TrayModel.skippableEvents(scheduler.cachedEvents, now: Date(), calendar: .current)
+        let now = Date()
+        let skippable = TrayModel.skippableEvents(scheduler.cachedEvents, now: now, calendar: .current)
         let skipParent = NSMenuItem(title: "Skip Meeting", action: nil, keyEquivalent: "")
         let skipMenu = NSMenu()
         if skippable.isEmpty {
@@ -108,6 +109,11 @@ final class TrayController: NSObject {
         }
         skipParent.submenu = skipMenu
         menu.addItem(skipParent)
+
+        // Snooze meeting: hide a not-yet-started meeting from the menu bar
+        // title until start minus the chosen lead. Alerts still fire and the
+        // calendar popover still lists it.
+        menu.addItem(snoozeMenuItem(now: now))
         menu.addItem(.separator())
 
         let settings = NSMenuItem(title: "Settings…", action: #selector(openSettings), keyEquivalent: "")
@@ -126,6 +132,66 @@ final class TrayController: NSObject {
         item.menu = menu
         item.button?.performClick(nil)
         item.menu = nil
+    }
+
+    /// One "Snooze Meeting" leaf: which meeting, and the lead to snooze it
+    /// to. A nil lead is "Show now", which clears the snooze.
+    private struct SnoozeChoice {
+        let key: String
+        let lead: Int?
+    }
+
+    private func snoozeMenuItem(now: Date) -> NSMenuItem {
+        let parent = NSMenuItem(title: "Snooze Meeting", action: nil, keyEquivalent: "")
+        let submenu = NSMenu()
+        let snoozable = TrayModel.snoozableEvents(scheduler.cachedEvents, now: now, calendar: .current)
+        if snoozable.isEmpty {
+            let none = NSMenuItem(title: "No meetings left to snooze today", action: nil, keyEquivalent: "")
+            none.isEnabled = false
+            submenu.addItem(none)
+        } else {
+            for event in snoozable {
+                let title = "\(Self.menuTimeFormatter.string(from: event.start))  \(event.title)"
+                let entry = NSMenuItem(title: title, action: nil, keyEquivalent: "")
+                let choices = NSMenu()
+                let active = scheduler.menuBarSnoozeLead(for: event)
+                let leads = TrayModel.availableSnoozeLeads(for: event, now: now)
+                if leads.isEmpty {
+                    let none = NSMenuItem(title: "Too close to start", action: nil, keyEquivalent: "")
+                    none.isEnabled = false
+                    choices.addItem(none)
+                }
+                for lead in leads {
+                    let label = lead < 60 ? "Until \(lead) minutes before" : "Until 1 hour before"
+                    let choice = NSMenuItem(title: label, action: #selector(applySnooze(_:)), keyEquivalent: "")
+                    choice.target = self
+                    choice.representedObject = SnoozeChoice(key: event.schedulerKey, lead: lead)
+                    choice.state = active == lead ? .on : .off
+                    choices.addItem(choice)
+                }
+                if active != nil {
+                    choices.addItem(.separator())
+                    let show = NSMenuItem(title: "Show now", action: #selector(applySnooze(_:)), keyEquivalent: "")
+                    show.target = self
+                    show.representedObject = SnoozeChoice(key: event.schedulerKey, lead: nil)
+                    choices.addItem(show)
+                }
+                entry.submenu = choices
+                submenu.addItem(entry)
+            }
+        }
+        parent.submenu = submenu
+        return parent
+    }
+
+    @objc private func applySnooze(_ sender: NSMenuItem) {
+        guard let choice = sender.representedObject as? SnoozeChoice,
+              let event = scheduler.cachedEvents.first(where: { $0.schedulerKey == choice.key }) else { return }
+        if let lead = choice.lead {
+            scheduler.snoozeMenuBar(event: event, leadMinutes: lead)
+        } else {
+            scheduler.clearMenuBarSnooze(event: event)
+        }
     }
 
     @objc private func toggleSkip(_ sender: NSMenuItem) {

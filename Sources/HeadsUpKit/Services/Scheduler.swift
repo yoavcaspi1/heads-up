@@ -93,8 +93,8 @@ final class Scheduler {
     /// Events for the menu bar surface: the cache minus skipped meetings.
     /// The calendar window keeps showing everything.
     var trayEvents: [CalendarEvent] {
-        let skipped = skippedKeys
-        return cachedEvents.filter { !skipped.contains($0.schedulerKey) }
+        TrayModel.menuBarEvents(cachedEvents, skipped: skippedKeys,
+                                snoozes: menuBarSnoozes, now: now())
     }
 
     func isSkipped(_ event: CalendarEvent) -> Bool {
@@ -122,6 +122,37 @@ final class Scheduler {
         }
         FileDiag.log("skip (event \(event.id.prefix(8))): meeting un-skipped")
         rescheduleNow()
+        notifyEventsChanged()
+    }
+
+    // MARK: - Menu bar snoozes
+
+    /// Meetings hidden from the menu bar title until start minus their lead.
+    /// Alerts are deliberately untouched: this is a menu bar surface only.
+    var menuBarSnoozes: [String: Int] { settingsStore.settings.menuBarSnoozes }
+
+    /// The stored lead for a meeting, whether or not its reveal time has
+    /// passed. Drives the submenu checkmark.
+    func menuBarSnoozeLead(for event: CalendarEvent) -> Int? {
+        menuBarSnoozes[event.schedulerKey]
+    }
+
+    func snoozeMenuBar(event: CalendarEvent, leadMinutes: Int) {
+        let key = event.schedulerKey
+        settingsStore.update { settings in
+            settings.menuBarSnoozes[key] = leadMinutes
+        }
+        FileDiag.log("menu bar snooze (event \(event.id.prefix(8))): hidden until \(leadMinutes) min before start")
+        notifyEventsChanged()
+    }
+
+    func clearMenuBarSnooze(event: CalendarEvent) {
+        let key = event.schedulerKey
+        guard menuBarSnoozes[key] != nil else { return }
+        settingsStore.update { settings in
+            settings.menuBarSnoozes[key] = nil
+        }
+        FileDiag.log("menu bar snooze (event \(event.id.prefix(8))): shown again now")
         notifyEventsChanged()
     }
 
@@ -228,6 +259,15 @@ final class Scheduler {
             if !staleSkips.isEmpty {
                 settingsStore.update { settings in
                     settings.skippedEvents.removeAll { staleSkips.contains($0) }
+                }
+            }
+            // Same treatment for menu bar snoozes, which additionally expire
+            // once their reveal time passes.
+            let staleSnoozes = TrayModel.staleMenuBarSnoozeKeys(
+                menuBarSnoozes, events: cachedEvents, now: current)
+            if !staleSnoozes.isEmpty {
+                settingsStore.update { settings in
+                    for key in staleSnoozes { settings.menuBarSnoozes[key] = nil }
                 }
             }
         }

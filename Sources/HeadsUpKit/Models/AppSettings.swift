@@ -62,10 +62,19 @@ struct AppSettings: Codable, Equatable {
     /// title and fires no alerts. Pruned by the scheduler once the event
     /// leaves the fetch window, so this never grows unbounded.
     var skippedEvents: [String]
+    /// Meetings snoozed from the menu bar, keyed by schedulerKey, valued by
+    /// the lead in minutes at which the meeting reappears in the menu bar
+    /// title. Alerts are untouched and the calendar list still shows the
+    /// meeting. Pruned by the scheduler once the reveal time passes or the
+    /// event leaves the fetch window.
+    var menuBarSnoozes: [String: Int]
 
     static let allowedLeadTimes = [0, 1, 2, 5, 10, 15, 30, 60]
     static let allowedSnoozeMinutes = [1, 2, 5, 10, 15, 30, 60]
     static let allowedMenuBarLeadMinutes = [1, 2, 5, 10, 15, 30, 45, 60, 120, 180, 240, 360, 480, 720, 1440]
+    /// The leads the "Snooze Meeting" submenu offers, and the only values a
+    /// persisted snooze may carry.
+    static let allowedMenuBarSnoozeLeads = [5, 10, 15, 30, 60]
     /// Standalone so the memberwise init can default to it without
     /// referring to `defaults`, which that same init builds.
     static let defaultMenuBarLeadMinutes = 1440
@@ -81,7 +90,8 @@ struct AppSettings: Codable, Equatable {
         appearance: .system,
         eventOpenTarget: .googleWeb,
         alertTitleFont: .syne,
-        skippedEvents: []
+        skippedEvents: [],
+        menuBarSnoozes: [:]
     )
 
     /// Clamp every field to legal values, falling back per index to defaults,
@@ -99,6 +109,7 @@ struct AppSettings: Codable, Equatable {
         out.disabledCalendars = input.disabledCalendars.filter { seen.insert($0).inserted }
         var seenSkips = Set<String>()
         out.skippedEvents = input.skippedEvents.filter { seenSkips.insert($0).inserted }
+        out.menuBarSnoozes = input.menuBarSnoozes.filter { allowedMenuBarSnoozeLeads.contains($0.value) }
         return out
     }
 
@@ -124,6 +135,7 @@ struct AppSettings: Codable, Equatable {
         self.eventOpenTarget = (try? c.decode(EventOpenTarget.self, forKey: .eventOpenTarget)) ?? d.eventOpenTarget
         self.alertTitleFont = (try? c.decode(AlertTitleFont.self, forKey: .alertTitleFont)) ?? d.alertTitleFont
         self.skippedEvents = (try? c.decode([String].self, forKey: .skippedEvents)) ?? d.skippedEvents
+        self.menuBarSnoozes = (try? c.decode([String: Int].self, forKey: .menuBarSnoozes)) ?? d.menuBarSnoozes
         self = AppSettings.sanitized(from: self)
     }
 
@@ -132,7 +144,7 @@ struct AppSettings: Codable, Equatable {
          menuBarLeadMinutes: Int = AppSettings.defaultMenuBarLeadMinutes,
          alertBackground: AlertBackground, appearance: Appearance,
          eventOpenTarget: EventOpenTarget = .googleWeb, alertTitleFont: AlertTitleFont = .syne,
-         skippedEvents: [String] = []) {
+         skippedEvents: [String] = [], menuBarSnoozes: [String: Int] = [:]) {
         self.alertLeadTimes = alertLeadTimes
         self.snoozeDurations = snoozeDurations
         self.alertsEnabled = alertsEnabled
@@ -144,5 +156,6 @@ struct AppSettings: Codable, Equatable {
         self.eventOpenTarget = eventOpenTarget
         self.alertTitleFont = alertTitleFont
         self.skippedEvents = skippedEvents
+        self.menuBarSnoozes = menuBarSnoozes
     }
 }

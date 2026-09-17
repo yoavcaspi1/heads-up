@@ -16,6 +16,21 @@ func appSettingsTests() async {
         try expectEqual(s.appearance, .system)
         try expectEqual(s.eventOpenTarget, .googleWeb)
         try expectEqual(s.skippedEvents, [])
+        try expectEqual(s.menuBarSnoozes, [:])
+    }
+
+    await test("testMenuBarSnoozesDecodeLenientlyAndRoundtrip") {
+        // Settings written before the field existed decode to no snoozes.
+        let legacy = try JSONDecoder().decode(AppSettings.self, from: Data("{}".utf8))
+        try expectEqual(legacy.menuBarSnoozes, [:])
+        // A lead outside the offered ladder is dropped, a good one survives.
+        let mixed = #"{"menuBarSnoozes":{"a::1":10,"b::2":7}}"#
+        let decoded = try JSONDecoder().decode(AppSettings.self, from: Data(mixed.utf8))
+        try expectEqual(decoded.menuBarSnoozes, ["a::1": 10])
+        var s = AppSettings.defaults
+        s.menuBarSnoozes = ["k::1": 30]
+        let round = try JSONDecoder().decode(AppSettings.self, from: JSONEncoder().encode(s))
+        try expectEqual(round.menuBarSnoozes, ["k::1": 30])
     }
 
     await test("testSanitizeRejectsDisallowedValuesPerIndex") {

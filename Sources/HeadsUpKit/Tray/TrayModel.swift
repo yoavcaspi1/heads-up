@@ -73,6 +73,63 @@ enum TrayModel {
             .sorted { $0.start < $1.start }
     }
 
+    // MARK: - Menu bar snooze
+
+    /// Candidates for the "Snooze Meeting" submenu: the skippable list minus
+    /// meetings already in progress, since a snooze can only hide something
+    /// that has not started.
+    static func snoozableEvents(_ events: [CalendarEvent], now: Date, calendar: Calendar) -> [CalendarEvent] {
+        skippableEvents(events, now: now, calendar: calendar).filter { $0.start > now }
+    }
+
+    /// When a snoozed meeting comes back to the menu bar title: its start
+    /// minus the chosen lead.
+    static func snoozeRevealDate(event: CalendarEvent, leadMinutes: Int) -> Date {
+        event.start.addingTimeInterval(-Double(leadMinutes) * 60)
+    }
+
+    /// The lead choices worth offering for a meeting: the standard ladder
+    /// minus any whose reveal time has already gone by.
+    static func availableSnoozeLeads(for event: CalendarEvent, now: Date) -> [Int] {
+        AppSettings.allowedMenuBarSnoozeLeads.filter {
+            snoozeRevealDate(event: event, leadMinutes: $0) > now
+        }
+    }
+
+    /// True while a menu bar snooze is still hiding this meeting.
+    static func isMenuBarSnoozed(event: CalendarEvent, snoozes: [String: Int], now: Date) -> Bool {
+        guard let lead = snoozes[event.schedulerKey] else { return false }
+        return now < snoozeRevealDate(event: event, leadMinutes: lead)
+    }
+
+    /// The events the menu bar title may draw from: the cache minus skipped
+    /// meetings and minus meetings still inside their snooze. The calendar
+    /// popover keeps showing everything.
+    static func menuBarEvents(_ events: [CalendarEvent], skipped: Set<String>,
+                              snoozes: [String: Int], now: Date) -> [CalendarEvent] {
+        events.filter {
+            !skipped.contains($0.schedulerKey)
+                && !isMenuBarSnoozed(event: $0, snoozes: snoozes, now: now)
+        }
+    }
+
+    /// Snooze entries that have served their purpose: the event has left the
+    /// cache, or its reveal time has passed. The scheduler drops these so the
+    /// dictionary never grows unbounded.
+    static func staleMenuBarSnoozeKeys(_ snoozes: [String: Int], events: [CalendarEvent],
+                                       now: Date) -> Set<String> {
+        var byKey: [String: CalendarEvent] = [:]
+        for event in events where byKey[event.schedulerKey] == nil {
+            byKey[event.schedulerKey] = event
+        }
+        var stale: Set<String> = []
+        for (key, lead) in snoozes {
+            guard let event = byKey[key] else { stale.insert(key); continue }
+            if snoozeRevealDate(event: event, leadMinutes: lead) <= now { stale.insert(key) }
+        }
+        return stale
+    }
+
     /// `leadMinutes`: how far ahead of its start a meeting may appear in the
     /// title. A meeting already in progress shows whatever the window is.
     static func state(events: [CalendarEvent], now: Date, leadMinutes: Int) -> TrayState {
