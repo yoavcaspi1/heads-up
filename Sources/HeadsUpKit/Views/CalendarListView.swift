@@ -94,6 +94,10 @@ struct CalendarListView: View {
     let onOpenEvent: (CalendarEvent) -> Void
     @ObservedObject var model: CalendarListModel
     let onOpenSettings: () -> Void
+    /// Called after the Join button opens a meeting link. Joining means the
+    /// reminder has done its job, so the app stops alerting for that event,
+    /// exactly as Join on the full-screen alert does.
+    var onJoined: (CalendarEvent) -> Void = { _ in }
 
     /// Fixed content size, shared with the popover that hosts the view.
     static let size = NSSize(width: 420, height: 640)
@@ -246,7 +250,7 @@ struct CalendarListView: View {
                     // schedulerKey, not id: a recurring series shares one id
                     // across its instances.
                     ForEach(section.events, id: \.schedulerKey) { event in
-                        EventRow(event: event, isToday: isToday, onOpen: onOpenEvent)
+                        EventRow(event: event, isToday: isToday, onOpen: onOpenEvent, onJoined: onJoined)
                     }
                 }
             }
@@ -258,6 +262,7 @@ struct CalendarListView: View {
         let event: CalendarEvent
         let isToday: Bool
         let onOpen: (CalendarEvent) -> Void
+        let onJoined: (CalendarEvent) -> Void
         @State private var hovered = false
 
         private static let timeFormatter: DateFormatter = {
@@ -320,6 +325,7 @@ struct CalendarListView: View {
         private func joinButton(url: URL) -> some View {
             Button {
                 NSWorkspace.shared.open(url)
+                onJoined(event)
             } label: {
                 HStack(spacing: YCDesignSystem.Spacing.xs) {
                     Image(systemName: "video")

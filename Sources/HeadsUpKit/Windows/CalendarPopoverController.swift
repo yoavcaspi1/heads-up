@@ -25,7 +25,8 @@ final class CalendarPopoverController: NSObject, NSPopoverDelegate {
         let model = CalendarListModel(scheduler: scheduler, registry: registry, credentials: credentials)
         self.model = model
         self.contentController = NSHostingController(
-            rootView: CalendarListView(onOpenEvent: onOpenEvent, model: model, onOpenSettings: onOpenSettings))
+            rootView: CalendarListView(onOpenEvent: onOpenEvent, model: model, onOpenSettings: onOpenSettings,
+                                       onJoined: { scheduler.markDismissed(event: $0) }))
         super.init()
     }
 
