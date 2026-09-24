@@ -291,11 +291,16 @@ struct CalendarListView: View {
         }
 
         private func rowContent(now: Date?) -> some View {
-            HStack(spacing: YCDesignSystem.Spacing.sm) {
+            // Today's meetings that have already ended read as done: muted
+            // title, faded row, no Join. Earlier days are already faded by
+            // their section; the TimelineView tick keeps this current.
+            let ended = isToday && !event.allDay && now.map { event.end <= $0 } == true
+            return HStack(spacing: YCDesignSystem.Spacing.sm) {
                 VStack(alignment: .leading, spacing: YCDesignSystem.Spacing.xs) {
                     Text(event.title)
                         .font(YCDesignSystem.Typography.body)
-                        .foregroundStyle(isToday ? YCDesignSystem.Colors.accent : YCDesignSystem.Colors.textPrimary)
+                        .foregroundStyle(ended ? YCDesignSystem.Colors.textMuted
+                                         : (isToday ? YCDesignSystem.Colors.accent : YCDesignSystem.Colors.textPrimary))
                         .lineLimit(1)
                     Text(timeRange)
                         .font(YCDesignSystem.Typography.code)
@@ -312,10 +317,11 @@ struct CalendarListView: View {
                 // Right of the countdown: a real Join control for rows that
                 // carry a meeting link. The Button consumes its own tap, so
                 // the row's open-in-calendar gesture never fires from here.
-                if let url = event.meetingUrl.flatMap(URL.init(string:)) {
+                if !ended, let url = event.meetingUrl.flatMap(URL.init(string:)) {
                     joinButton(url: url)
                 }
             }
+            .opacity(ended ? 0.6 : 1)
             .padding(.horizontal, YCDesignSystem.Spacing.sm)
             .padding(.vertical, YCDesignSystem.Spacing.xs)
         }
