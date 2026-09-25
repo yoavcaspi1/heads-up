@@ -57,6 +57,9 @@ public final class AppDelegate: NSObject, NSApplicationDelegate {
             onSnooze: { [weak self] event, minutes in
                 self?.scheduler.snooze(event: event, minutes: minutes)
             },
+            onSnoozeUntilEvent: { [weak self] event in
+                self?.scheduler.snoozeUntilStart(event: event)
+            },
             onUserDismissed: { [weak self] event in
                 self?.scheduler.markDismissed(event: event)
             })

@@ -17,6 +17,7 @@ struct AlertView: View {
     let onJoin: () -> Void
     let onDismiss: () -> Void
     let onSnooze: (Int) -> Void
+    let onSnoozeUntilEvent: () -> Void
 
     private static let clock: DateFormatter = {
         let f = DateFormatter()
@@ -155,7 +156,6 @@ struct AlertView: View {
     }
 
     private func snoozeRow(now: Date) -> some View {
-        let minutesUntilStart = min(120, max(1, Int(ceil(event.start.timeIntervalSince(now) / 60))))
         // Spec: "Until event" is disabled when under 90 seconds remain, so
         // exactly 90 seconds must still be enabled.
         let canSnoozeUntilEvent = event.start.timeIntervalSince(now) >= 90
@@ -168,7 +168,7 @@ struct AlertView: View {
             HStack(spacing: YCDesignSystem.Spacing.sm) {
                 snoozeButton(humanizeDuration(first)) { onSnooze(first) }
                 snoozeButton(humanizeDuration(second)) { onSnooze(second) }
-                snoozeButton("Until event", disabled: !canSnoozeUntilEvent) { onSnooze(minutesUntilStart) }
+                snoozeButton("Until event", disabled: !canSnoozeUntilEvent) { onSnoozeUntilEvent() }
                 Menu {
                     ForEach(extraSnooze.filter { $0 != first && $0 != second }, id: \.self) { m in
                         Button(humanizeDuration(m)) { onSnooze(m) }

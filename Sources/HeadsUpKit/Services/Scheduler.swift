@@ -65,6 +65,10 @@ final class Scheduler {
     /// No further lead-time alerts fire for these, unlike a fired key which
     /// only consumes one lead time.
     private var dismissedKeys: Set<String> = []
+    /// Events snoozed "Until event": no lead-time alert fires for these at
+    /// all, only the re-show at the start time. Kept apart from the snooze
+    /// window so a lead time falling inside it is never merely deferred.
+    private var heldUntilStartKeys: Set<String> = []
     private var eventsChangedObservers: [UUID: () -> Void] = [:]
     private var accountsStateObservers: [UUID: () -> Void] = [:]
     private var lastReconnectState = false
@@ -173,6 +177,7 @@ final class Scheduler {
         snoozeTimers = [:]
         snoozedKeys = []
         dismissedKeys = []
+        heldUntilStartKeys = []
     }
 
     private func clearAlertTimers() {
@@ -250,6 +255,7 @@ final class Scheduler {
         let currentEventKeys = Set(cachedEvents.map(\.schedulerKey))
         fired = fired.filter { firedKey in currentEventKeys.contains { firedKey.hasPrefix("\($0)@") } }
         dismissedKeys = dismissedKeys.intersection(currentEventKeys)
+        heldUntilStartKeys = heldUntilStartKeys.intersection(currentEventKeys)
         // Prune skips whose events left the fetch window, but only when the
         // cache is non-empty and something actually went stale: this runs
         // every poll and must not rewrite settings.json each minute (or wipe
@@ -273,7 +279,7 @@ final class Scheduler {
         }
         let plans = AlertPlanner.plan(events: cachedEvents, settings: settingsStore.settings,
                                       now: current, fired: fired, snoozedKeys: snoozedKeys,
-                                      dismissedKeys: dismissedKeys.union(skippedKeys))
+                                      dismissedKeys: dismissedKeys.union(skippedKeys).union(heldUntilStartKeys))
         for plan in plans {
             let delay = plan.fireAt.timeIntervalSince(current)
             if delay <= 0 {
@@ -295,6 +301,7 @@ final class Scheduler {
         // Likewise a timer armed before the user dismissed or skipped it.
         if dismissedKeys.contains(plan.event.schedulerKey) { return }
         if skippedKeys.contains(plan.event.schedulerKey) { return }
+        if heldUntilStartKeys.contains(plan.event.schedulerKey) { return }
         fired.insert(plan.timerKey)
         showAlert(plan.event)
     }
@@ -314,10 +321,24 @@ final class Scheduler {
     /// Re-show the event after `minutes`, suppressing its other lead-time
     /// alerts until then. Does not affect other events.
     func snooze(event: CalendarEvent, minutes: Int) {
+        snooze(event: event, until: now().addingTimeInterval(Double(minutes) * 60))
+    }
+
+    /// "Until event": the next alert for this event is the one at its start
+    /// time. Every lead-time alert still ahead is dropped rather than
+    /// deferred, and the re-show lands on the start itself, not on the
+    /// minute-rounded snooze the plain buttons use.
+    func snoozeUntilStart(event: CalendarEvent) {
+        heldUntilStartKeys.insert(event.schedulerKey)
+        snooze(event: event, until: event.start)
+        rescheduleNow()
+    }
+
+    private func snooze(event: CalendarEvent, until fireAt: Date) {
         let key = event.schedulerKey
         snoozeTimers[key]?.invalidate()
         snoozedKeys.insert(key)
-        let timer = Timer.scheduledTimer(withTimeInterval: Double(minutes) * 60, repeats: false) { [weak self] _ in
+        let timer = Timer(fire: fireAt, interval: 0, repeats: false) { [weak self] _ in
             guard let self else { return }
             self.snoozeTimers[key] = nil
             self.snoozedKeys.remove(key)
@@ -328,6 +349,8 @@ final class Scheduler {
             guard self.settingsStore.settings.alertsEnabled else { return }
             self.showAlert(event)
         }
+        // Common modes: the re-show must not wait for an open menu to close.
+        RunLoop.main.add(timer, forMode: .common)
         snoozeTimers[key] = timer
     }
 }

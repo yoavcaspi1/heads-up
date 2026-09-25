@@ -26,6 +26,7 @@ enum AlertEscapeGate {
 final class AlertWindowController {
     private let settingsStore: SettingsStore
     private let onSnooze: (CalendarEvent, Int) -> Void
+    private let onSnoozeUntilEvent: (CalendarEvent) -> Void
     /// Fired when the USER dismisses an alert (Dismiss button, Join, Escape),
     /// as opposed to programmatic dismissals and the snooze path. The app
     /// suppresses every remaining alert for that event.
@@ -64,9 +65,11 @@ final class AlertWindowController {
 
     init(settingsStore: SettingsStore,
          onSnooze: @escaping (CalendarEvent, Int) -> Void,
+         onSnoozeUntilEvent: @escaping (CalendarEvent) -> Void,
          onUserDismissed: @escaping (CalendarEvent) -> Void) {
         self.settingsStore = settingsStore
         self.onSnooze = onSnooze
+        self.onSnoozeUntilEvent = onSnoozeUntilEvent
         self.onUserDismissed = onUserDismissed
     }
 
@@ -333,6 +336,10 @@ final class AlertWindowController {
             onDismiss: { [weak self] in self?.dismissByUser() },
             onSnooze: { [weak self] minutes in
                 self?.onSnooze(event, minutes)
+                self?.dismiss()
+            },
+            onSnoozeUntilEvent: { [weak self] in
+                self?.onSnoozeUntilEvent(event)
                 self?.dismiss()
             })
 
